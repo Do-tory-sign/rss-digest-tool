@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Noto+Sans+KR:wght@300;400;700;900&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  width: 1080px; height: 1080px;
+  font-family: 'Segoe UI Emoji', 'Nunito', 'Noto Sans KR', sans-serif;
+  overflow: hidden;
+  background: #FEFAF0;
+  position: relative;
+}
+body.why { background: #FDEEDC; }
+
+.bg-illustration { position: absolute; inset: 0; z-index: 0; }
+.bg-illustration img { width: 100%; height: 100%; object-fit: cover; opacity: 0.43; }
+.bg-overlay {
+  position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(to bottom, rgba(254,250,240,0.55) 0%, rgba(254,250,240,0.94) 70%);
+}
+body.why .bg-overlay {
+  background: linear-gradient(to bottom, rgba(253,238,220,0.55) 0%, rgba(253,238,220,0.94) 70%);
+}
+
+.time-pill {
+  position: absolute; z-index: 2; top: 56px; left: 64px;
+  background: #FFF3D6; border-radius: 100px;
+  padding: 16px 40px;
+  font-family: 'Segoe UI Emoji', 'Noto Sans KR', sans-serif;
+  font-size: 28px; font-weight: 800; color: #B45309;
+}
+.brand-pill {
+  position: absolute; z-index: 2; top: 46px; right: 56px;
+  background: rgba(59,46,34,0.85); border-radius: 100px;
+  padding: 12px 24px 12px 12px;
+  display: flex; align-items: center; gap: 8px;
+}
+.brand-pill img { width: 34px; height: 34px; border-radius: 50%; object-fit: contain; }
+.brand-pill span {
+  font-family: 'Nunito', sans-serif;
+  font-size: 22px; font-weight: 900; color: #FFF7E8; letter-spacing: 0.02em;
+}
+
+.label-bar {
+  position: absolute; z-index: 2; left: 64px; top: 160px;
+  display: flex; align-items: center; gap: 12px;
+}
+.label-bar .bar { width: 6px; height: 50px; background: #D97706; border-radius: 3px; }
+.label-bar .text {
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 36px; font-weight: 800; color: #B45309;
+  letter-spacing: 0.04em;
+}
+.headline {
+  position: absolute; z-index: 2; left: 64px; right: 64px; top: 250px;
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 58px; font-weight: 900; color: #3B2E22;
+  line-height: 1.45; word-break: keep-all;
+}
+/* 2026-07-02: 아웃룩 카드는 말풍선이랑 겹칠랑말랑해서 왜중요 카드 본문 글씨 크기로 맞춤 */
+body.outlook .headline { font-size: 46px; }
+
+.why-text {
+  position: absolute; z-index: 2; left: 64px; right: 64px; top: 250px;
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 58px; font-weight: 900; color: #3B2E22;
+  line-height: 1.45; word-break: keep-all;
+  text-align: center;
+}
+
+.pose-char { position: absolute; z-index: 2; width: 420px; height: 420px; }
+.pose-char img {
+  width: 100%; height: 100%; object-fit: contain;
+  filter: drop-shadow(0 6px 20px rgba(0,0,0,0.14));
+}
+.pose-br { right: 20px; bottom: 40px; }
+.pose-tc { left: 50%; top: 560px; transform: translateX(-50%); }
+.pose-bl { left: 20px; bottom: 40px; }
+
+.reaction-bubble {
+  position: absolute; z-index: 3;
+  background: #FFF9EC; border: 3px solid #F0B429;
+  border-radius: 30px; padding: 22px 32px;
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 28px; font-weight: 800; color: #7C4A1E;
+  max-width: 380px; line-height: 1.4; word-break: keep-all;
+  box-shadow: 0 8px 20px rgba(180,83,9,0.14), 0 2px 6px rgba(180,83,9,0.08);
+}
+.reaction-bubble::before, .reaction-bubble::after {
+  content: ""; position: absolute;
+  background: #FFF9EC; border: 3px solid #F0B429;
+  border-radius: 50%;
+}
+/* 말풍선은 도토리 머리 바로 위(스택)가 아니라, 캐릭터/본문과 안 겹치는 빈 공간에 배치하고
+   꼬리(점)로 캐릭터 쪽을 가리키게 — 감정 표정과 본문 텍스트를 가리지 않도록 */
+.rb-br { left: 330px; bottom: 350px; text-align: left; }
+.rb-br::before { width: 26px; height: 26px; right: 30px; bottom: -20px; }
+.rb-br::after { width: 14px; height: 14px; right: 16px; bottom: -34px; }
+/* why 카드는 캐릭터가 중앙이라 위쪽 여백이 좁음 — 완전히 비어있는 하단 우측 코너에 배치 */
+.rb-tc { right: 40px; bottom: 60px; text-align: left; }
+.rb-tc::before { width: 26px; height: 26px; left: 30px; top: -20px; }
+.rb-tc::after { width: 14px; height: 14px; left: 16px; top: -34px; }
+.rb-bl { right: 284px; bottom: 400px; text-align: left; }
+.rb-bl::before { width: 26px; height: 26px; left: 30px; bottom: -20px; }
+.rb-bl::after { width: 14px; height: 14px; left: 16px; bottom: -34px; }
+
+.caption {
+  position: absolute; z-index: 2; left: 64px; bottom: 52px;
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 26px; color: #9C8A72;
+}
+body.outlook .caption { left: auto; right: 64px; text-align: right; }
+
+.vp-split { position: absolute; z-index: 2; left: 64px; right: 64px; top: 240px; height: 420px; display: flex; gap: 24px; }
+.vp-side { flex: 1; border-radius: 32px; padding: 44px 36px; }
+.vp-side.a { background: #FDEEDC; }
+.vp-side.b { background: #F3E9E1; }
+.vp-label { font-family: 'Noto Sans KR', sans-serif; font-size: 26px; font-weight: 800; margin-bottom: 24px; }
+.vp-side.a .vp-label { color: #B45309; }
+.vp-side.b .vp-label { color: #7C4A1E; }
+.vp-quote { font-family: 'Noto Sans KR', sans-serif; font-size: 32px; font-weight: 700; color: #3B2E22; line-height: 1.5; word-break: keep-all; }
+.vp-summary {
+  position: absolute; z-index: 2; left: 64px; right: 64px; bottom: 110px;
+  background: #3B2E22; border-radius: 32px; padding: 44px 48px;
+}
+.vp-summary .text {
+  font-family: 'Noto Sans KR', sans-serif; font-size: 36px; font-weight: 800;
+  color: #FFF7E8; line-height: 1.5; text-align: center; word-break: keep-all;
+}
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // 헤드라인은 캐릭터 위 1cm(약 38px)까지는 괜찮으니, 실제로 겹치기 직전까지만 줄인다
+  const charEl = document.querySelector('.pose-char');
+  const maxBottom = charEl ? charEl.offsetTop - 38 : 900;
+  document.querySelectorAll('.headline, .why-text').forEach(el => {
+    let size = parseFloat(getComputedStyle(el).fontSize);
+    let guard = 0;
+    while (el.offsetTop + el.scrollHeight > maxBottom && size > 26 && guard < 20) {
+      size -= 2;
+      el.style.fontSize = size + 'px';
+      guard++;
+    }
+  });
+  document.querySelectorAll('.vp-quote, .vp-summary .text').forEach(el => {
+    const len = el.textContent.trim().length;
+    let base = parseFloat(getComputedStyle(el).fontSize);
+    if (len > 60) el.style.fontSize = (base * 0.82) + 'px';
+    if (len > 90) el.style.fontSize = (base * 0.68) + 'px';
+  });
+  document.querySelectorAll('.reaction-bubble').forEach(el => {
+    const len = el.textContent.trim().length;
+    let base = parseFloat(getComputedStyle(el).fontSize);
+    if (len > 16) el.style.fontSize = (base * 0.85) + 'px';
+  });
+});
+</script>
+</head>
+<body class="{{ body_class }}">
+
+{% if image_src %}<div class="bg-illustration"><img src="{{ image_src }}" alt=""></div>{% endif %}
+<div class="bg-overlay"></div>
+
+<div class="time-pill">{{ time_label }}</div>
+{% if brand_icon_path %}<div class="brand-pill"><img src="{{ brand_icon_path }}" alt=""><span>DO's TORY</span></div>{% endif %}
+<div class="label-bar"><div class="bar"></div><div class="text">{{ label }}</div></div>
+
+{% if variant == 'fact' %}
+  <div class="headline">{{ headline }}</div>
+  {% if acorn_path %}<div class="pose-char pose-br"><img src="{{ acorn_path }}" alt=""></div>{% endif %}
+  {% if reaction %}<div class="reaction-bubble rb-br">{{ reaction }}</div>{% endif %}
+  {% if caption %}<div class="caption">{{ caption }}</div>{% endif %}
+
+{% elif variant == 'why' %}
+  <div class="why-text">{{ headline }}</div>
+  {% if acorn_path %}<div class="pose-char pose-tc"><img src="{{ acorn_path }}" alt=""></div>{% endif %}
+  {% if reaction %}<div class="reaction-bubble rb-tc">{{ reaction }}</div>{% endif %}
+
+{% elif variant == 'outlook' %}
+  <div class="headline">{{ headline }}</div>
+  {% if acorn_path %}<div class="pose-char pose-bl"><img src="{{ acorn_path }}" alt=""></div>{% endif %}
+  {% if reaction %}<div class="reaction-bubble rb-bl">{{ reaction }}</div>{% endif %}
+  {% if caption %}<div class="caption">{{ caption }}</div>{% endif %}
+
+{% elif variant == 'viewpoint' %}
+  <div class="vp-split">
+    <div class="vp-side a">
+      <div class="vp-label">{{ vp_a_label }}</div>
+      <div class="vp-quote">{{ vp_a_quote }}</div>
+    </div>
+    <div class="vp-side b">
+      <div class="vp-label">{{ vp_b_label }}</div>
+      <div class="vp-quote">{{ vp_b_quote }}</div>
+    </div>
+  </div>
+  <div class="vp-summary"><div class="text">{{ vp_summary }}</div></div>
+{% endif %}
+
+</body>
+</html>

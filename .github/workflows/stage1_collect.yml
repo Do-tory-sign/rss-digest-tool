@@ -1,0 +1,97 @@
+name: "Stage 1 - 뉴스 수집 + 기사 승인 요청"
+
+# 하루 4슬롯(아침06/점심11/저녁16/야식21, 한국시간=UTC+9) 정각에 실행.
+# cron은 UTC 기준이므로 9시간을 빼서 등록한다: 06,11,16,21 KST -> 21(전날),02,07,12 UTC
+on:
+  schedule:
+    - cron: "0 21 * * *"   # 06:00 KST (전날 21:00 UTC) -> morning
+    - cron: "0 2  * * *"   # 11:00 KST -> lunch
+    - cron: "0 7  * * *"   # 16:00 KST -> evening
+    - cron: "0 12 * * *"   # 21:00 KST -> night
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: "슬롯 (morning/lunch/evening/night) — 수동 실행 시 지정"
+        required: true
+        type: choice
+        options: [morning, lunch, evening, night]
+  repository_dispatch:
+    types: [article_regen]   # 재생성 버튼 클릭 시 이 워크플로우를 다시 돌려 기사를 다시 뽑는다
+
+env:
+  PYTHONIOENCODING: "utf-8"
+
+jobs:
+  determine-slot:
+    runs-on: windows-latest
+    outputs:
+      slot: ${{ steps.pick.outputs.slot }}
+    steps:
+      - id: pick
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $slot = "${{ inputs.slot }}"
+          } elseif ("${{ github.event_name }}" -eq "repository_dispatch") {
+            $slot = "${{ github.event.client_payload.slot }}"
+          } else {
+            # cron: 어떤 스케줄이 지금 막 매칭됐는지는 알 수 없으므로, 현재 UTC 시각으로 판정
+            $h = (Get-Date).ToUniversalTime().Hour
+            switch ($h) {
+              21 { $slot = "morning" }
+              2  { $slot = "lunch" }
+              7  { $slot = "evening" }
+              12 { $slot = "night" }
+              default { $slot = "morning" }
+            }
+          }
+          echo "slot=$slot" >> $env:GITHUB_OUTPUT
+
+  collect:
+    needs: determine-slot
+    runs-on: windows-latest
+    env:
+      SLOT: ${{ needs.determine-slot.outputs.slot }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      BRAND_NAME: ${{ secrets.BRAND_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 의존성 설치
+        run: pip install -r requirements.txt
+
+      - name: D 드라이브 출력 폴더 준비 (config.py의 하드코딩된 OUTPUT_DIR과 동일 경로)
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path "D:/Dotory/Cardnews/output" | Out-Null
+
+      - name: 재생성 피드백 추출 (article_regen 이벤트일 때만)
+        id: feedback
+        if: github.event_name == 'repository_dispatch'
+        shell: pwsh
+        run: |
+          $extra = python cloud/dispatch_payload.py extra
+          echo "category=$extra" >> $env:GITHUB_OUTPUT
+
+      - name: 뉴스 수집 + 큐레이션 + 이미지 생성 (v2_main.py 그대로 재사용)
+        shell: pwsh
+        run: |
+          python -X utf8 v2_main.py --slot $env:SLOT --fresh
+
+      - name: 텔레그램 기사 승인 요청 전송
+        shell: pwsh
+        run: |
+          python cloud/telegram_gate.py send-article --slot $env:SLOT
+
+      - name: 산출물 캐시 저장 (Stage 2에서 이어받기 위함)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: D:/Dotory/Cardnews/output
+          key: dotory-output-${{ github.run_id }}

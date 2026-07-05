@@ -1,0 +1,22 @@
+name: "기사 반려 처리"
+
+on:
+  repository_dispatch:
+    types: [article_rejected]
+
+jobs:
+  notify-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install requests python-dotenv
+      - name: 반려 알림만 전송 (배포 없음)
+        shell: bash
+        run: |
+          python cloud/telegram_gate.py notify --text "❌ [${{ github.event.client_payload.slot }}] 기사 반려됨 — 오늘 이 슬롯 게시 취소"
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>도토리 뉴스</title>
+<meta name="application-name" content="도토리 뉴스">
+<meta name="apple-mobile-web-app-title" content="도토리 뉴스">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="favicon.png">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Noto+Sans+KR:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream: #FEFAF0;
+    --amber: #F59E0B;
+    --amber-dark: #D97706;
+    --brown: #92400E;
+    --brown-dark: #78350F;
+    --brown-mid: #B45309;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: var(--cream);
+    color: var(--brown-dark);
+    min-height: 100vh;
+  }
+
+  .top-stripe {
+    height: 5px;
+    background: linear-gradient(90deg, #F59E0B, #D97706, #B45309, #D97706, #F59E0B);
+  }
+
+  header {
+    background: white;
+    border-bottom: 2px solid rgba(180,83,9,0.12);
+    padding: 16px 24px;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 12px rgba(180,83,9,0.08);
+  }
+  .header-inner {
+    max-width: 680px; margin: 0 auto;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .logo {
+    font-family: 'Nunito', sans-serif;
+    font-size: 22px; font-weight: 900;
+    line-height: 1;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .logo .do   { color: #78350F; }
+  .logo .apos { color: #B45309; }
+  .logo .tory { color: #D97706; }
+  .logo .news { color: #92400E; font-size: 0.6em; font-weight: 700; letter-spacing: 0.15em; margin-left: 6px; }
+
+  .insta-link {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13px; font-weight: 700;
+    color: var(--brown-mid);
+    text-decoration: none;
+    background: rgba(180,83,9,0.07);
+    border: 1.5px solid rgba(180,83,9,0.18);
+    border-radius: 100px;
+    padding: 7px 14px;
+    transition: background 0.15s;
+  }
+  .insta-link:hover { background: rgba(180,83,9,0.14); }
+  .insta-link svg { width: 15px; height: 15px; fill: var(--brown-mid); }
+
+  /* 탭 — 3개 고정 */
+  .tabs-wrap {
+    position: sticky;
+    top: 57px;
+    background: var(--cream);
+    border-bottom: 1.5px solid rgba(180,83,9,0.12);
+    z-index: 99;
+  }
+  .tabs {
+    max-width: 680px; margin: 0 auto;
+    display: flex;
+    padding: 0 16px;
+  }
+  .tab {
+    flex: 1;
+    padding: 14px 0;
+    font-family: 'Nunito', sans-serif;
+    font-size: 14px; font-weight: 800;
+    color: var(--brown); opacity: 0.45;
+    cursor: pointer;
+    border-bottom: 2.5px solid transparent;
+    text-align: center;
+    white-space: nowrap;
+    transition: opacity 0.15s, border-color 0.15s, color 0.15s;
+  }
+  .tab:hover { opacity: 0.75; }
+  .tab.active {
+    color: var(--amber-dark);
+    opacity: 1;
+    border-bottom-color: var(--amber-dark);
+  }
+
+  /* 메인 영역 */
+  main { max-width: 680px; margin: 0 auto; padding: 24px 16px 80px; }
+
+  /* 날짜 헤더 */
+  .day-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 20px;
+  }
+  .day-label {
+    font-family: 'Nunito', sans-serif;
+    font-size: 17px; font-weight: 900;
+    color: var(--brown-dark);
+  }
+  .day-divider {
+    flex: 1; height: 1.5px;
+    background: linear-gradient(90deg, rgba(180,83,9,0.2), transparent);
+  }
+  .today-badge {
+    font-size: 12px; font-weight: 700;
+    color: white; background: var(--amber-dark);
+    padding: 3px 10px; border-radius: 100px;
+  }
+
+  /* 뉴스 카드 */
+  .news-card {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 12px;
+    border: 1.5px solid rgba(180,83,9,0.1);
+    box-shadow: 0 2px 12px rgba(180,83,9,0.06);
+  }
+  .news-card-top {
+    display: flex; align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .cat-badge {
+    font-family: 'Nunito', sans-serif;
+    font-size: 13px; font-weight: 800;
+    padding: 4px 14px; border-radius: 100px;
+    border: 1.5px solid;
+  }
+  .cat-hot  { color: #C2410C; border-color: rgba(194,65,12,0.3);  background: rgba(194,65,12,0.07); }
+  .cat-eco  { color: #B45309; border-color: rgba(180,83,9,0.3);   background: rgba(180,83,9,0.07);  }
+  .cat-trd  { color: #7C4012; border-color: rgba(124,64,18,0.3);  background: rgba(124,64,18,0.07); }
+
+  .source-tag { font-size: 12px; color: var(--brown); opacity: 0.55; }
+
+  .news-headline {
+    font-size: 18px; font-weight: 700;
+    color: var(--brown-dark); line-height: 1.4;
+    margin-bottom: 8px; word-break: keep-all;
+  }
+  .news-headline mark {
+    background: rgba(245,158,11,0.25);
+    color: inherit; border-radius: 3px; padding: 0 2px;
+  }
+  .news-summary {
+    font-size: 14px; font-weight: 300;
+    color: var(--brown); line-height: 1.8;
+    word-break: keep-all;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-bottom: 14px;
+  }
+  .news-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13px; font-weight: 700;
+    color: var(--brown-mid);
+    background: rgba(180,83,9,0.07);
+    border: 1.5px solid rgba(180,83,9,0.18);
+    border-radius: 100px;
+    padding: 7px 18px;
+    text-decoration: none;
+    transition: background 0.15s;
+  }
+  .news-link:hover { background: rgba(180,83,9,0.14); }
+  .news-link::after { content: ' →'; }
+
+  /* ── 지난 뉴스 컨트롤 바 ── */
+  .archive-controls {
+    display: flex; gap: 10px; align-items: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .search-wrap {
+    flex: 1; min-width: 160px;
+    position: relative;
+  }
+  .search-wrap svg {
+    position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+    width: 15px; height: 15px;
+    fill: none; stroke: var(--brown-mid); stroke-width: 2;
+    opacity: 0.6; pointer-events: none;
+  }
+  .search-input {
+    width: 100%;
+    padding: 10px 14px 10px 36px;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 14px; font-weight: 400;
+    color: var(--brown-dark);
+    background: white;
+    border: 1.5px solid rgba(180,83,9,0.18);
+    border-radius: 100px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .search-input:focus { border-color: var(--amber-dark); }
+  .search-input::placeholder { color: var(--brown); opacity: 0.4; }
+
+  .month-select {
+    padding: 10px 16px;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 13px; font-weight: 700;
+    color: var(--brown-mid);
+    background: white;
+    border: 1.5px solid rgba(180,83,9,0.18);
+    border-radius: 100px;
+    outline: none;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 32px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23B45309' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    transition: border-color 0.15s;
+  }
+  .month-select:focus { border-color: var(--amber-dark); }
+
+  .result-count {
+    font-size: 12px; font-weight: 700;
+    color: var(--brown); opacity: 0.45;
+    white-space: nowrap;
+    align-self: center;
+  }
+
+  /* 날짜 칩 행 */
+  .date-chips {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    margin-bottom: 20px;
+  }
+  .date-chip {
+    padding: 6px 14px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 13px; font-weight: 800;
+    color: var(--brown-mid);
+    background: white;
+    border: 1.5px solid rgba(180,83,9,0.18);
+    border-radius: 100px;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+  }
+  .date-chip:hover { background: rgba(180,83,9,0.07); }
+  .date-chip.active {
+    background: var(--amber-dark);
+    border-color: var(--amber-dark);
+    color: white;
+  }
+
+  /* 날짜 그룹 */
+  .date-group { margin-bottom: 32px; }
+
+  /* 빈 상태 */
+  .empty {
+    text-align: center; padding: 80px 20px;
+    color: var(--brown); opacity: 0.4;
+    font-size: 15px; line-height: 2;
+  }
+
+  /* 랜딩 */
+  #landing {
+    display: none;
+    max-width: 680px; margin: 0 auto;
+    padding: 48px 24px 80px;
+    text-align: center;
+  }
+  #landing.visible { display: block; }
+
+  .landing-hero {
+    width: 200px; height: 200px;
+    object-fit: contain;
+    margin: 0 auto 32px; display: block;
+    filter: drop-shadow(0 8px 24px rgba(180,83,9,0.15));
+  }
+  .landing-title {
+    font-family: 'Nunito', sans-serif;
+    font-size: 36px; font-weight: 900;
+    line-height: 1; margin-bottom: 10px;
+  }
+  .landing-title .do   { color: #78350F; }
+  .landing-title .apos { color: #B45309; }
+  .landing-title .tory { color: #D97706; }
+  .landing-title .news { color: #92400E; font-size: 0.45em; font-weight: 700; letter-spacing: 0.2em; vertical-align: middle; margin-left: 6px; }
+
+  .landing-tagline {
+    font-size: 18px; font-weight: 700;
+    color: var(--brown); margin-bottom: 8px; word-break: keep-all;
+  }
+  .landing-sub {
+    font-size: 14px; font-weight: 300;
+    color: var(--brown); opacity: 0.7;
+    line-height: 1.8; margin-bottom: 36px; word-break: keep-all;
+  }
+  .landing-cats {
+    display: flex; justify-content: center; gap: 12px;
+    margin-bottom: 36px; flex-wrap: wrap;
+  }
+  .landing-cat {
+    font-family: 'Nunito', sans-serif;
+    font-size: 14px; font-weight: 800;
+    padding: 8px 22px; border-radius: 100px; border: 2px solid;
+  }
+  .landing-cat.hot { color: #C2410C; border-color: rgba(194,65,12,0.3); background: rgba(194,65,12,0.07); }
+  .landing-cat.eco { color: #B45309; border-color: rgba(180,83,9,0.3);  background: rgba(180,83,9,0.07); }
+  .landing-cat.trd { color: #7C4012; border-color: rgba(124,64,18,0.3); background: rgba(124,64,18,0.07); }
+
+  .landing-divider {
+    width: 48px; height: 3px;
+    background: linear-gradient(90deg, #F59E0B, #D97706);
+    border-radius: 2px; margin: 0 auto 36px;
+  }
+  .landing-cta {
+    display: inline-block;
+    background: linear-gradient(135deg, #F59E0B, #D97706);
+    color: white; font-size: 15px; font-weight: 700;
+    padding: 14px 36px; border-radius: 100px; border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(217,119,6,0.3);
+    transition: transform 0.15s, box-shadow 0.15s;
+    text-decoration: none;
+  }
+  .landing-cta:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(217,119,6,0.4);
+  }
+
+  footer {
+    text-align: center; padding: 32px 16px;
+    font-size: 12px; color: var(--brown);
+    opacity: 0.4; border-top: 1px solid rgba(180,83,9,0.1);
+  }
+
+  /* ── 기사 상세 뷰 ── */
+  #article-view { display: none; }
+  .back-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 14px; font-weight: 700;
+    color: var(--brown-mid);
+    background: rgba(180,83,9,0.07);
+    border: 1.5px solid rgba(180,83,9,0.18);
+    border-radius: 100px;
+    padding: 8px 18px;
+    cursor: pointer; font-family: inherit;
+    margin-bottom: 24px;
+    transition: background 0.15s;
+  }
+  .back-btn:hover { background: rgba(180,83,9,0.14); }
+  .article-img {
+    width: 100%; border-radius: 14px;
+    border: 1px solid rgba(180,83,9,0.1);
+    margin: 20px 0 28px; display: block;
+  }
+  .article-title {
+    font-size: 22px; font-weight: 700;
+    color: var(--brown-dark); line-height: 1.45;
+    margin: 14px 0 10px; word-break: keep-all;
+  }
+  .article-lead {
+    font-size: 15px; font-weight: 400;
+    color: var(--brown); line-height: 1.8;
+    margin-bottom: 20px; word-break: keep-all;
+    padding-bottom: 20px;
+    border-bottom: 1.5px solid rgba(180,83,9,0.1);
+  }
+  .article-body p {
+    font-size: 15px; font-weight: 300;
+    color: var(--brown-dark); line-height: 1.9;
+    margin-bottom: 18px; word-break: keep-all;
+  }
+  .article-src {
+    margin-top: 32px; padding: 16px 20px;
+    background: white;
+    border: 1.5px solid rgba(180,83,9,0.1);
+    border-radius: 14px;
+    font-size: 13px; color: var(--brown); line-height: 1.7;
+  }
+  .article-src b { color: var(--brown-dark); font-weight: 700; }
+  .read-more {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13px; font-weight: 700;
+    color: var(--brown-mid);
+    background: rgba(180,83,9,0.07);
+    border: 1.5px solid rgba(180,83,9,0.18);
+    border-radius: 100px;
+    padding: 7px 18px;
+    cursor: pointer; font-family: inherit;
+    transition: background 0.15s;
+  }
+  .read-more:hover { background: rgba(180,83,9,0.14); }
+  .read-more::after { content: ' →'; }
+</style>
+</head>
+<body>
+<div class="top-stripe"></div>
+
+<header>
+  <div class="header-inner">
+    <a class="logo" href="#" onclick="showHome();return false;">
+      <span class="do">DO</span><span class="apos">'s</span>
+      <span class="tory"> TORY</span><span class="news"> NEWS</span>
+    </a>
+    <a class="insta-link" href="https://www.instagram.com/do.tory_news/" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+      </svg>
+      @do.tory_news
+    </a>
+  </div>
+</header>
+
+<!-- 탭 3개 고정 -->
+<div class="tabs-wrap">
+  <div class="tabs">
+    <div class="tab active" id="tab-home"    onclick="showHome()">홈</div>
+    <div class="tab"        id="tab-today"   onclick="showToday()">TODAY</div>
+    <div class="tab"        id="tab-archive" onclick="showArchive()">지난 뉴스</div>
+  </div>
+</div>
+
+<!-- 홈 (랜딩) -->
+<div id="landing" class="visible">
+  <img class="landing-hero" src="hero.png" alt="DO's TORY NEWS">
+  <div class="landing-title">
+    <span class="do">DO</span><span class="apos">'s</span>
+    <span class="tory"> TORY</span><span class="news"> NEWS</span>
+  </div>
+  <p class="landing-tagline">꼭 읽어야 할 뉴스만 담았습니다</p>
+  <p class="landing-sub">매일 오전 7시, 오늘의 핵심 뉴스를<br>세 가지 카테고리로 정리해드려요</p>
+  <div class="landing-cats">
+    <span class="landing-cat hot">HOT 핫뉴스</span>
+    <span class="landing-cat eco">ECO 경제·IT</span>
+    <span class="landing-cat trd">TRD 트렌드</span>
+  </div>
+  <div class="landing-divider"></div>
+  <a class="landing-cta" href="https://www.instagram.com/do.tory_news/" target="_blank" rel="noopener">
+    @do.tory_news 팔로우
+  </a>
+</div>
+
+<!-- TODAY -->
+<main id="today-view" style="display:none;"></main>
+
+<!-- 기사 상세 뷰 -->
+<div id="article-view">
+  <main style="max-width:680px; margin:0 auto; padding:24px 16px 80px;">
+    <button class="back-btn" id="back-btn" onclick="closeArticle()">← 뒤로</button>
+    <div id="article-content"></div>
+  </main>
+</div>
+
+<!-- 지난 뉴스 -->
+<main id="archive-view" style="display:none;">
+  <div class="archive-controls">
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="22" y2="22"/>
+      </svg>
+      <input class="search-input" id="search-input"
+             type="text" placeholder="키워드 검색..."
+             oninput="onSearchInput()" autocomplete="off">
+    </div>
+    <select class="month-select" id="month-select" onchange="onMonthChange()">
+      <option value="">전체 날짜</option>
+    </select>
+    <span class="result-count" id="result-count"></span>
+  </div>
+  <div class="date-chips" id="date-chips" style="display:none;"></div>
+  <div id="archive-results"></div>
+</main>
+
+<footer>DO's TORY NEWS &nbsp;|&nbsp; @do.tory_news</footer>
+
+<script>
+const CAT_CLASS = { hot: 'cat-hot', economy: 'cat-eco', culture: 'cat-trd' };
+const CAT_LABEL = { hot: 'HOT', economy: 'ECO', culture: 'TRD' };
+
+let allData = [];
+let activeDate = '';  // 날짜 칩에서 선택된 특정 날짜
+
+/* ── 날짜 포맷 ── */
+function formatDate(str) {
+  if (!str) return '';
+  const days = ['일','월','화','수','목','금','토'];
+  const [y, m, d] = str.split('.');
+  if (!y || !m || !d) return str;
+  const day = days[new Date(+y, +m - 1, +d).getDay()];
+  return `${y}.${m}.${d} (${day})`;
+}
+
+/* ── 오늘 날짜 문자열 (data.json 형식) ── */
+function todayStr() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}.${m}.${day}`;
+}
+
+let _prevTab = 'tab-home';  // 기사 뷰에서 뒤로 갈 탭 기억
+
+/* ── 탭 활성화 ── */
+function setTab(id) {
+  ['tab-home','tab-today','tab-archive'].forEach(t => {
+    document.getElementById(t).classList.toggle('active', t === id);
+  });
+}
+
+function hideAll() {
+  document.getElementById('landing').classList.remove('visible');
+  document.getElementById('today-view').style.display    = 'none';
+  document.getElementById('archive-view').style.display  = 'none';
+  document.getElementById('article-view').style.display  = 'none';
+}
+
+/* ── 홈 ── */
+function showHome() {
+  hideAll();
+  setTab('tab-home');
+  document.getElementById('landing').classList.add('visible');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ── TODAY ── */
+function showToday(pushHistory = true) {
+  hideAll();
+  setTab('tab-today');
+  _prevTab = 'tab-today';
+  document.getElementById('today-view').style.display = 'block';
+  if (pushHistory) history.pushState({tab: 'today'}, '', '#today');
+
+  const today = todayStr();
+  const entry = allData.find(e => e.date === today) || allData[0];
+  const view  = document.getElementById('today-view');
+
+  if (!entry || !entry.news.length) {
+    view.innerHTML = '<div class="empty">오늘 뉴스가 아직 없습니다.<br>매일 오전 7시에 업데이트돼요.</div>';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
+  view.innerHTML =
+    `<div class="day-header">
+       <span class="day-label">${formatDate(entry.date)}</span>
+       <span class="today-badge">TODAY</span>
+       <div class="day-divider"></div>
+     </div>` +
+    entry.news.map(item => cardHTML(item, '')).join('');
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ── 기사 상세 뷰 ── */
+function showArticle(item) {
+  hideAll();
+  document.getElementById('article-view').style.display = 'block';
+  history.pushState({isArticle: true, fromTab: _prevTab}, '', '#article');
+
+  const catClass = CAT_CLASS[item.category] || 'cat-hot';
+  const catLabel = CAT_LABEL[item.category] || item.category.toUpperCase();
+  const srcText = item.source_count >= 2
+    ? `${(item.outlets || []).join(', ')} 등 ${item.source_count}곳의 보도를 비교해 공통으로 확인된 사실만 담아 도토리뉴스가 다시 썼어요.`
+    : `${(item.outlets || [item.source])[0] || ''}의 보도를 바탕으로 확인된 사실만 담아 도토리뉴스가 다시 썼어요.`;
+
+  const bodyHTML = (item.body || []).map(p => `<p>${p}</p>`).join('');
+
+  document.getElementById('article-content').innerHTML = `
+    <span class="cat-badge ${catClass}">${catLabel}</span>
+    <div class="article-title">${item.headline}</div>
+    ${item.lead ? `<div class="article-lead">${item.lead}</div>` : ''}
+    ${item.image ? `<img class="article-img" src="${item.image}" alt="기사 일러스트">` : ''}
+    <div class="article-body">${bodyHTML || `<p>${item.summary || ''}</p>`}</div>
+    ${item.outlets && item.outlets.length ? `<div class="article-src"><b>이 기사는요</b><br>${srcText}</div>` : ''}
+  `;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function closeArticle() {
+  history.back();
+}
+
+window.addEventListener('popstate', (e) => {
+  if (!e.state) { showHome(); return; }
+  if (e.state.tab === 'today') showToday(false);
+  else if (e.state.tab === 'archive') showArchive(false);
+  else if (!e.state.isArticle) showHome();
+});
+
+/* ── 지난 뉴스 탭 진입 ── */
+function showArchive(pushHistory = true) {
+  hideAll();
+  setTab('tab-archive');
+  _prevTab = 'tab-archive';
+  document.getElementById('archive-view').style.display = 'block';
+  if (pushHistory) history.pushState({tab: 'archive'}, '', '#archive');
+
+  // 월별 드롭다운 초기화 (한 번만)
+  const sel = document.getElementById('month-select');
+  if (sel.options.length === 1) {
+    const months = [...new Set(pastData().map(e => e.date.slice(0, 7)))];
+    months.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m;
+      const [y, mo] = m.split('.');
+      opt.textContent = `${y}년 ${+mo}월`;
+      sel.appendChild(opt);
+    });
+  }
+
+  activeDate = '';
+  renderDateChips();
+  filterArchive();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ── 월 변경 → 날짜 칩 갱신 ── */
+function onMonthChange() {
+  activeDate = '';
+  renderDateChips();
+  filterArchive();
+}
+
+/* ── 검색창 입력 ── */
+function onSearchInput() {
+  activeDate = '';
+  renderDateChips();  // 칩 선택 해제
+  filterArchive();
+}
+
+/* ── 날짜 칩 렌더 ── */
+function renderDateChips() {
+  const month     = document.getElementById('month-select').value;
+  const chipsWrap = document.getElementById('date-chips');
+
+  if (!month) {
+    chipsWrap.style.display = 'none';
+    chipsWrap.innerHTML = '';
+    return;
+  }
+
+  const datesInMonth = pastData()
+    .filter(e => e.date.startsWith(month))
+    .map(e => e.date);
+
+  if (!datesInMonth.length) {
+    chipsWrap.style.display = 'none';
+    chipsWrap.innerHTML = '';
+    return;
+  }
+
+  chipsWrap.style.display = 'flex';
+  chipsWrap.innerHTML = datesInMonth.map(date => {
+    const d   = date.split('.')[2];          // "03"
+    const isActive = date === activeDate;
+    return `<button class="date-chip ${isActive ? 'active' : ''}"
+                    onclick="selectDateChip('${date}')">${+d}일</button>`;
+  }).join('');
+}
+
+/* ── 날짜 칩 클릭 ── */
+function selectDateChip(date) {
+  // 같은 칩 다시 클릭 → 선택 해제
+  activeDate = (activeDate === date) ? '' : date;
+  renderDateChips();
+  filterArchive();
+}
+
+/* ── 과거 데이터 (오늘 제외) ── */
+function pastData() {
+  const today = todayStr();
+  return allData.filter(e => e.date !== today);
+}
+
+/* ── 검색+필터 ── */
+function filterArchive() {
+  const kw    = document.getElementById('search-input').value.trim().toLowerCase();
+  const month = document.getElementById('month-select').value;
+
+  let data = pastData();
+
+  // 특정 날짜 칩 선택 시 해당 날짜만
+  if (activeDate) {
+    data = data.filter(e => e.date === activeDate);
+  } else if (month) {
+    data = data.filter(e => e.date.startsWith(month));
+  }
+
+  // 키워드 필터
+  if (kw) {
+    data = data.map(entry => ({
+      ...entry,
+      news: entry.news.filter(item =>
+        (item.headline || '').toLowerCase().includes(kw) ||
+        (item.summary  || '').toLowerCase().includes(kw)
+      )
+    })).filter(entry => entry.news.length > 0);
+  }
+
+  // 결과 수
+  const total = data.reduce((s, e) => s + e.news.length, 0);
+  document.getElementById('result-count').textContent =
+    (kw || month || activeDate) ? `${total}건` : '';
+
+  // 렌더
+  const container = document.getElementById('archive-results');
+  if (!data.length) {
+    container.innerHTML = '<div class="empty">검색 결과가 없습니다.</div>';
+    return;
+  }
+
+  container.innerHTML = data.map(entry =>
+    `<div class="date-group">
+       <div class="day-header">
+         <span class="day-label">${formatDate(entry.date)}</span>
+         <div class="day-divider"></div>
+       </div>
+       ${entry.news.map(item => cardHTML(item, kw)).join('')}
+     </div>`
+  ).join('');
+}
+
+/* ── 카드 HTML ── */
+function cardHTML(item, kw) {
+  const catClass  = CAT_CLASS[item.category] || 'cat-hot';
+  const catLabel  = CAT_LABEL[item.category] || item.category.toUpperCase();
+  const summary   = (item.summary || '').replace(/<br>/g, ' ').replace(/\|\|/g, ' ');
+  const headline  = kw ? highlight(item.headline || '', kw) : (item.headline || '');
+  const isV2      = !!(item.body && item.body.length);
+  const sourceTag = isV2
+    ? (item.source_count >= 2 ? `출처 ${item.source_count}곳 종합` : (item.outlets || [])[0] || '')
+    : (item.source || '');
+
+  const actionBtn = isV2
+    ? `<button class="read-more" onclick='showArticle(${JSON.stringify(item).replace(/'/g, "&#39;")})'>자세히 보기</button>`
+    : (item.link ? `<a class="news-link" href="${item.link}" target="_blank" rel="noopener">원문 보기</a>` : '');
+
+  return `<div class="news-card">
+    <div class="news-card-top">
+      <span class="cat-badge ${catClass}">${catLabel}</span>
+      <span class="source-tag">${sourceTag}</span>
+    </div>
+    <div class="news-headline">${headline}</div>
+    <div class="news-summary">${summary}</div>
+    ${actionBtn}
+  </div>`;
+}
+
+/* ── 키워드 하이라이트 ── */
+function highlight(text, kw) {
+  if (!kw) return text;
+  const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return text.replace(new RegExp(`(${escaped})`, 'gi'), '<mark>$1</mark>');
+}
+
+/* ── 초기 로드 — 홈 탭 유지 ── */
+async function load() {
+  try {
+    const res = await fetch('data.json?t=' + Date.now());
+    allData = await res.json();
+  } catch (e) {
+    document.getElementById('today-view').innerHTML =
+      '<div class="empty">데이터를 불러올 수 없습니다.</div>';
+  }
+  // 홈 탭이 기본 — 별도 탭 전환 없음
+}
+
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+name: "카드 1장 재생성"
+
+on:
+  repository_dispatch:
+    types: [card_regen]
+
+env:
+  PYTHONIOENCODING: "utf-8"
+
+jobs:
+  regen-one-card:
+    runs-on: windows-latest
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      BRAND_NAME: ${{ secrets.BRAND_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+
+      - name: D 드라이브 출력 폴더 준비
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path "D:/Dotory/Cardnews/output" | Out-Null
+
+      - name: Stage 2 산출물 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: D:/Dotory/Cardnews/output
+          key: dotory-output-nokey
+          restore-keys: |
+            dotory-output-
+
+      - name: 슬롯/카드명 추출
+        id: p
+        shell: pwsh
+        run: |
+          $slot = python cloud/dispatch_payload.py slot
+          $card = python cloud/dispatch_payload.py extra
+          echo "slot=$slot" >> $env:GITHUB_OUTPUT
+          echo "card=$card" >> $env:GITHUB_OUTPUT
+
+      - name: 카드 재생성 + 재전송 (main.py의 regenerate_single_card 재사용)
+        shell: pwsh
+        run: |
+          python cloud/regen_card_and_notify.py --slot ${{ steps.p.outputs.slot }} --card ${{ steps.p.outputs.card }}
+
+      - name: 갱신된 산출물 재저장
+        uses: actions/cache/save@v4
+        with:
+          path: D:/Dotory/Cardnews/output
+          key: dotory-output-${{ github.run_id }}

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Noto+Sans+KR:wght@300;400;700;900&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  width: 1080px; height: 1080px;
+  font-family: 'Nunito', 'Noto Sans KR', sans-serif;
+  overflow: hidden;
+  background: #FEFAF0;
+}
+
+/* ── 상단 이미지 55% ── */
+.image-section {
+  position: relative;
+  width: 1080px;
+  height: 594px; /* 55% of 1080 */
+  background-image: url('{{ image_src }}');
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
+}
+
+/* 이미지 하단 페이드: 텍스트 섹션으로 자연스럽게 */
+.image-fade {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 120px;
+  background: linear-gradient(transparent, #FEFAF0);
+}
+
+/* 카테고리 뱃지 — 이미지 위 우상단 */
+.cat-pill {
+  position: absolute;
+  top: 24px; left: 28px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 19px; font-weight: 800;
+  padding: 8px 22px; border-radius: 100px;
+  letter-spacing: 0.06em;
+  backdrop-filter: blur(6px);
+}
+body.hot .cat-pill  { color: #C2410C; background: rgba(255,245,240,0.82); border: 1.5px solid rgba(194,65,12,0.25); }
+body.eco .cat-pill  { color: #B45309; background: rgba(255,251,235,0.82); border: 1.5px solid rgba(180,83,9,0.25); }
+body.soc .cat-pill  { color: #7C4012; background: rgba(253,246,236,0.82); border: 1.5px solid rgba(124,64,18,0.25); }
+
+/* 브랜드 워터마크 — 이미지 우상단 */
+.watermark {
+  position: absolute; top: 20px; right: 24px;
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(0,0,0,0.28); backdrop-filter: blur(4px);
+  border-radius: 100px; padding: 6px 14px;
+}
+.watermark img { width: 28px; height: 28px; object-fit: contain; }
+.watermark-text {
+  font-family: 'Nunito', sans-serif;
+  font-size: 16px; font-weight: 900;
+  color: rgba(255,255,255,0.90); letter-spacing: 0.02em;
+}
+
+/* ── 하단 텍스트 45% ── */
+.text-section {
+  width: 1080px;
+  height: 486px; /* 45% of 1080 */
+  padding: 28px 56px 0;
+  display: flex; flex-direction: column;
+  background: #FEFAF0;
+}
+
+/* 카테고리 컬러 탑바 — 이미지/텍스트 경계에 얇은 라인 */
+.accent-bar {
+  width: 52px; height: 5px; border-radius: 3px;
+  margin-bottom: 22px; flex-shrink: 0;
+}
+body.hot .accent-bar { background: linear-gradient(90deg, #E8472B, #F97316); }
+body.eco .accent-bar { background: linear-gradient(90deg, #F59E0B, #D97706); }
+body.soc .accent-bar { background: linear-gradient(90deg, #7C4012, #B45309); }
+
+.headline {
+  font-size: 58px; font-weight: 900;
+  color: #1C0A00; line-height: 1.2;
+  letter-spacing: -0.02em;
+  word-break: keep-all;
+  flex-shrink: 0;
+  margin-bottom: 18px;
+}
+
+.lead {
+  font-size: 28px; font-weight: 400;
+  color: #44200A; line-height: 1.6;
+  word-break: keep-all;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* 푸터 */
+.footer {
+  display: flex; align-items: center; justify-content: space-between;
+  height: 60px; margin-top: auto;
+  border-top: 1.5px solid rgba(180,83,9,0.10);
+  flex-shrink: 0;
+}
+.source { font-size: 20px; color: #78350F; opacity: 0.65; }
+.source strong { font-weight: 700; opacity: 1; }
+.footer-date { font-size: 20px; color: #92400E; opacity: 0.50; }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const h = document.querySelector('.headline');
+  const len = h.textContent.trim().length;
+  if (len > 20) h.style.fontSize = '50px';
+  if (len > 28) h.style.fontSize = '44px';
+  if (len > 36) h.style.fontSize = '38px';
+
+  // 본문(lead)이 영역을 넘칠 때만 — 실제로 잘리는 지점에 '···'를 붙임 (안 넘치면 그대로 전체 표시)
+  const lead = document.querySelector('.lead');
+  if (lead.scrollHeight > lead.clientHeight) {
+    const original = lead.textContent;
+    let lo = 0, hi = original.length;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      lead.textContent = original.slice(0, mid) + '···';
+      if (lead.scrollHeight > lead.clientHeight) hi = mid - 1;
+      else lo = mid;
+    }
+    lead.textContent = original.slice(0, lo).trimEnd() + '···';
+  }
+});
+</script>
+</head>
+<body class="{{ category }}">
+
+<div class="image-section">
+  <div class="cat-pill">{{ cat_label }}</div>
+  <div class="watermark">
+    <img src="{{ acorn_path }}" alt="">
+    <span class="watermark-text">DO's TORY</span>
+  </div>
+  <div class="image-fade"></div>
+</div>
+
+<div class="text-section">
+  <div class="accent-bar"></div>
+  <div class="headline">{{ headline }}</div>
+  <div class="lead">{{ lead }}</div>
+  <div class="footer">
+    <div class="source">출처 <strong>{{ source }}</strong></div>
+    <div class="footer-date">{{ date }}</div>
+  </div>
+</div>
+
+</body>
+</html>

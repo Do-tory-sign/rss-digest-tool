@@ -1,0 +1,17 @@
+{
+  "name": "도토리 뉴스",
+  "short_name": "도토리 뉴스",
+  "description": "DO's TORY NEWS — MZ세대를 위한 뉴스",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FEFAF0",
+  "theme_color": "#F59E0B",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "any",
+      "type": "image/png"
+    }
+  ]
+}

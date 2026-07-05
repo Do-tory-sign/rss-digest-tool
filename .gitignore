@@ -1,0 +1,36 @@
+# 민감정보 / 인증 관련
+.env
+instagram_graph_token.json
+instagram_session.json
+blog/naver_engine/data/dotory_blofit_settings.json
+runtime/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# 자동화용 크롬 프로필/세션 (로그인 쿠키 포함 — 반드시 제외)
+chrome_debug_dotory/
+
+# 로그/산출물 (D: 드라이브에 있지만 혹시 로컬 경로 실수 대비)
+output/
+*.log
+run_logs/
+
+# 임시 스크린샷/디버그 파일
+*_check*.png
+_top*.png
+scratch_*.png
+
+# Firebase 캐시
+.firebase/
+
+# Node
+node_modules/
+
+# OS
+Thumbs.db
+.DS_Store

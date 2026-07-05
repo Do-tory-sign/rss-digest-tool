@@ -1,0 +1,88 @@
+name: "Stage 3 - 실제 배포 (사이트+인스타+블로그)"
+
+on:
+  repository_dispatch:
+    types: [cards_approved]
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: "슬롯 (테스트/수동 실행용)"
+        required: true
+        type: choice
+        options: [morning, lunch, evening, night]
+
+env:
+  PYTHONIOENCODING: "utf-8"
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      BRAND_NAME: ${{ secrets.BRAND_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Node.js (firebase-tools 용)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: firebase-tools 설치
+        run: npm install -g firebase-tools
+
+      - name: 의존성 설치
+        run: pip install -r requirements.txt
+
+      - name: D 드라이브 출력 폴더 준비
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path "D:/Dotory/Cardnews/output" | Out-Null
+
+      - name: 슬롯 결정
+        id: slot
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "repository_dispatch") {
+            $slot = python cloud/dispatch_payload.py slot
+          } else {
+            $slot = "${{ inputs.slot }}"
+          }
+          echo "slot=$slot" >> $env:GITHUB_OUTPUT
+
+      - name: Stage 2가 만든 승인된 카드 이미지 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: D:/Dotory/Cardnews/output
+          key: dotory-output-nokey
+          restore-keys: |
+            dotory-output-
+
+      - name: instagram_graph_token.json 복원 (Secret -> 파일)
+        shell: pwsh
+        run: |
+          Set-Content -Path "instagram_graph_token.json" -Value '${{ secrets.INSTAGRAM_GRAPH_TOKEN_JSON }}' -Encoding utf8NoBOM
+
+      - name: Firebase 서비스 계정 인증
+        shell: pwsh
+        run: |
+          Set-Content -Path "firebase_service_account.json" -Value '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}' -Encoding utf8NoBOM
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$pwd/firebase_service_account.json" >> $env:GITHUB_ENV
+
+      - name: 실제 배포 (main.py --publish-only 그대로 재사용 — 사이트+인스타+블로그)
+        shell: pwsh
+        run: |
+          python -X utf8 main.py --slot ${{ steps.slot.outputs.slot }} --publish-only
+
+      - name: 민감 파일 정리
+        if: always()
+        shell: pwsh
+        run: |
+          Remove-Item -Force -ErrorAction SilentlyContinue instagram_graph_token.json
+          Remove-Item -Force -ErrorAction SilentlyContinue firebase_service_account.json

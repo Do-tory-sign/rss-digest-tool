@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Noto+Sans+KR:wght@300;400;700;900&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  width: 1080px; height: 1080px;
+  font-family: 'Nunito', 'Noto Sans KR', sans-serif;
+  overflow: hidden;
+  background: #FEFAF0;
+}
+.bg {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse at 90% 10%, #FFE4B0 0%, transparent 55%),
+    radial-gradient(ellipse at 10% 90%, #FFD580 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, #FFF8DC 0%, #FEFAF0 100%);
+}
+.deco-circle { position: absolute; border-radius: 50%; }
+.dc1 { width:400px; height:400px; background:#F59E0B; opacity:0.08; top:-120px; right:-80px; }
+.dc2 { width:300px; height:300px; background:#D97706; opacity:0.07; bottom:-80px; left:-60px; }
+.dc3 { width:200px; height:200px; background:#B45309; opacity:0.06; top:300px; right:50px; }
+.top-stripe {
+  position: absolute; top: 0; left: 0; right: 0; height: 8px;
+  background: linear-gradient(90deg, #F59E0B, #D97706, #B45309, #D97706, #F59E0B);
+}
+.bottom-stripe {
+  position: absolute; bottom: 0; left: 0; right: 0; height: 8px;
+  background: linear-gradient(90deg, #F59E0B, #D97706, #B45309, #D97706, #F59E0B);
+}
+
+.card {
+  position: relative; z-index: 10;
+  width: 1080px; height: 1080px;
+  display: flex; flex-direction: column;
+}
+
+/* 헤더 */
+.header {
+  display: flex; align-items: center;
+  padding: 0 40px; height: 90px;
+  border-bottom: 1.5px solid rgba(180,83,9,0.12);
+  background: rgba(255,255,255,0.6);
+}
+.header-brand { display: flex; align-items: center; gap: 14px; }
+.brand-text {
+  font-family: 'Nunito', sans-serif;
+  font-size: 26px; font-weight: 900; letter-spacing: -0.01em;
+}
+.brand-text .do   { color: #78350F; }
+.brand-text .apos { color: #B45309; }
+.brand-text .tory { color: #D97706; }
+.brand-text .news { color: #92400E; font-weight: 700; font-size: 0.7em; letter-spacing: 0.1em; margin-left: 6px; }
+
+/* 메인 */
+.main {
+  flex: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 0 80px;
+}
+
+.acorn-wrap {
+  width: 340px; height: 340px;
+  margin-bottom: 44px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 8px 40px rgba(180,83,9,0.15), 0 2px 8px rgba(180,83,9,0.1);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  border: 3px solid #FDE68A;
+}
+.acorn-wrap img { width: 304px; height: 304px; object-fit: contain; }
+
+.main-title {
+  font-family: 'Nunito', 'Noto Sans KR', sans-serif;
+  font-size: 56px; font-weight: 900;
+  color: #78350F;
+  line-height: 1.25; letter-spacing: -0.02em;
+  margin-bottom: 20px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.accent-bar {
+  width: 72px; height: 5px;
+  background: linear-gradient(90deg, #F59E0B, #D97706, #B45309);
+  border-radius: 3px;
+  margin-bottom: 24px;
+}
+
+.sub-copy {
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 33px; font-weight: 400;
+  color: #92400E;
+  text-align: center;
+  margin-bottom: 56px;
+  letter-spacing: -0.01em;
+  line-height: 1.5;
+}
+
+.tags { display: flex; gap: 16px; }
+.tag {
+  padding: 12px 28px; border-radius: 100px;
+  font-size: 22px; font-weight: 700; border: 2px solid;
+  font-family: 'Nunito', sans-serif;
+}
+.tag-hot { color: #C2410C; border-color: rgba(194,65,12,0.28); background: rgba(194,65,12,0.08); }
+.tag-eco { color: #B45309; border-color: rgba(180,83,9,0.3);   background: rgba(180,83,9,0.07); }
+.tag-trd { color: #92400E; border-color: rgba(146,64,14,0.28); background: rgba(146,64,14,0.08); }
+
+/* 푸터 */
+.footer {
+  display: flex; flex-direction: column; align-items: center;
+  padding-bottom: 36px;
+  gap: 0;
+}
+.footer-divider {
+  width: 880px; height: 1.5px;
+  background: rgba(180,83,9,0.15);
+  margin-bottom: 24px;
+}
+.insta-handle {
+  font-family: 'Nunito', sans-serif;
+  font-size: 32px; font-weight: 800;
+  color: #B45309;
+  letter-spacing: 0.03em;
+}
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="deco-circle dc1"></div>
+<div class="deco-circle dc2"></div>
+<div class="deco-circle dc3"></div>
+<div class="top-stripe"></div>
+
+<div class="card">
+  <div class="header">
+    <div class="header-brand">
+      <span class="brand-text">
+        <span class="do">DO</span><span class="apos">'s</span>
+        <span class="tory"> TORY</span><span class="news"> NEWS</span>
+      </span>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="acorn-wrap"><img src="{{ acorn_path }}" alt="DO's TORY NEWS"></div>
+    <div class="main-title">하루 네 번, 한입 뉴스</div>
+    <div class="accent-bar"></div>
+    <div class="sub-copy">꼭 읽어야 할 뉴스만, 쉽고 빠르게 담았습니다.</div>
+    <div class="tags">
+      <div class="tag tag-hot">아침한입</div>
+      <div class="tag tag-eco">점심한입</div>
+      <div class="tag tag-trd">저녁한입</div>
+      <div class="tag tag-hot">야식한입</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-divider"></div>
+    <div class="insta-handle">@do.tory_news</div>
+  </div>
+</div>
+
+<div class="bottom-stripe"></div>
+</body>
+</html>

@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Noto+Sans+KR:wght@300;400;700;900&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  width: 1080px; height: 1080px;
+  font-family: 'Nunito', 'Noto Sans KR', sans-serif;
+  overflow: hidden;
+  background: #1a0f00;
+}
+
+/* 풀블리드 배경 이미지 */
+.bg-image {
+  position: absolute; inset: 0;
+  background-image: url('{{ image_src }}');
+  background-size: cover;
+  background-position: center top;
+}
+
+/* 어두운 그라디언트 오버레이 — 상단은 약하게, 하단은 강하게 */
+.overlay-top {
+  position: absolute; inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(10, 5, 0, 0.55) 0%,
+    rgba(10, 5, 0, 0.10) 35%,
+    rgba(10, 5, 0, 0.10) 50%,
+    rgba(10, 5, 0, 0.75) 75%,
+    rgba(10, 5, 0, 0.90) 100%
+  );
+}
+
+/* 전체 카드 레이아웃 */
+.card {
+  position: relative; z-index: 10;
+  width: 1080px; height: 1080px;
+  display: flex; flex-direction: column;
+  justify-content: space-between;
+  padding: 52px 56px 48px;
+}
+
+/* 상단: 브랜드 + 날짜 */
+.top-row {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.brand {
+  display: flex; align-items: center; gap: 14px;
+}
+.brand img {
+  width: 56px; height: 56px; object-fit: contain;
+  border-radius: 50%; background: rgba(255,255,255,0.15);
+  padding: 6px;
+}
+.brand-text {
+  font-family: 'Nunito', sans-serif;
+  font-size: 28px; font-weight: 900;
+  letter-spacing: -0.01em;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.5);
+}
+.brand-text .do   { color: #FDE68A; }
+.brand-text .apos { color: #FCD34D; }
+.brand-text .tory { color: #FDE68A; }
+.brand-text .news {
+  color: #FEF3C7; font-weight: 700; font-size: 0.62em;
+  letter-spacing: 0.12em; margin-left: 8px;
+}
+.date-badge {
+  font-size: 22px; font-weight: 400;
+  color: rgba(255,255,255,0.78);
+  text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+  letter-spacing: 0.04em;
+}
+
+/* 하단 콘텐츠 */
+.bottom-section {
+  display: flex; flex-direction: column; gap: 0;
+}
+
+/* 오늘의 뉴스 타이틀 */
+.main-label {
+  font-family: 'Nunito', sans-serif;
+  font-size: 18px; font-weight: 800;
+  color: #FCD34D;
+  letter-spacing: 0.3em;
+  margin-bottom: 14px;
+  opacity: 0.9;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.7);
+}
+.main-title {
+  font-size: 70px; font-weight: 900;
+  color: #FFFFFF;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  text-shadow: 0 2px 16px rgba(0,0,0,0.7);
+  margin-bottom: 8px;
+}
+.main-sub {
+  font-size: 26px; font-weight: 400;
+  color: rgba(255,255,255,0.70);
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.6);
+  margin-bottom: 32px;
+}
+
+/* 구분선 */
+.divider {
+  width: 48px; height: 3px;
+  background: linear-gradient(90deg, #F59E0B, #FDE68A);
+  border-radius: 2px;
+  margin-bottom: 28px;
+}
+
+/* 헤드라인 프리뷰 */
+.headlines { display: flex; flex-direction: column; gap: 12px; }
+.hl-row {
+  display: flex; align-items: center; gap: 16px;
+}
+.hl-badge {
+  font-family: 'Nunito', sans-serif;
+  font-size: 15px; font-weight: 800;
+  padding: 5px 16px; border-radius: 100px;
+  flex-shrink: 0; letter-spacing: 0.08em;
+  background: rgba(255,255,255,0.12);
+  border: 1.5px solid rgba(255,255,255,0.25);
+  color: #FDE68A;
+  backdrop-filter: blur(4px);
+}
+.hl-text {
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 24px; font-weight: 700;
+  color: rgba(255,255,255,0.90);
+  white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; min-width: 0;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.6);
+}
+
+/* 도토리 이모지 */
+.dotori-emoji {
+  position: absolute;
+  top: 52px; right: 56px;
+  font-size: 52px;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
+}
+</style>
+</head>
+<body>
+<div class="bg-image"></div>
+<div class="overlay-top"></div>
+
+<div class="card">
+  <div class="top-row">
+    <div class="brand">
+      <img src="{{ acorn_path }}" alt="">
+      <span class="brand-text">
+        <span class="do">DO</span><span class="apos">'s</span>
+        <span class="tory"> TORY</span><span class="news"> NEWS</span>
+      </span>
+    </div>
+    <div class="date-badge">{{ date_badge }}</div>
+  </div>
+
+  <div class="bottom-section">
+    <div class="main-label">TODAY'S ISSUES</div>
+    <div class="main-title">오늘의 뉴스<br>3가지</div>
+    <div class="main-sub">{{ date_main }}</div>
+    <div class="divider"></div>
+    <div class="headlines">
+      <div class="hl-row">
+        <span class="hl-badge">HOT</span>
+        <span class="hl-text">{{ hot_headline }}</span>
+      </div>
+      <div class="hl-row">
+        <span class="hl-badge">ECO</span>
+        <span class="hl-text">{{ eco_headline }}</span>
+      </div>
+      <div class="hl-row">
+        <span class="hl-badge">TRD</span>
+        <span class="hl-text">{{ trd_headline }}</span>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

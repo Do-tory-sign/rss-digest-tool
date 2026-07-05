@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Noto+Sans+KR:wght@300;400;700;900&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  width: 1080px; height: 1080px;
+  font-family: 'Nunito', 'Noto Sans KR', sans-serif;
+  overflow: hidden; background: #FEFAF0;
+}
+
+body.hot { background: linear-gradient(150deg, #FFF5EE 0%, #FEFAF0 60%); }
+body.eco { background: linear-gradient(150deg, #FFFBEB 0%, #FEFAF0 60%); }
+body.soc { background: linear-gradient(150deg, #FDF6EC 0%, #FEFAF0 60%); }
+
+.top-bar { position: absolute; top: 0; left: 0; right: 0; height: 10px; }
+body.hot .top-bar { background: linear-gradient(90deg, #E8472B, #F97316); }
+body.eco .top-bar { background: linear-gradient(90deg, #F59E0B, #D97706); }
+body.soc .top-bar { background: linear-gradient(90deg, #7C4012, #B45309); }
+
+.bg-circle { position: absolute; border-radius: 50%; filter: blur(60px); }
+body.hot .bg-circle-1 { width:500px; height:500px; background:#FDBA74; opacity:0.18; top:-100px; right:-100px; }
+body.hot .bg-circle-2 { width:350px; height:350px; background:#FED7AA; opacity:0.18; bottom:-80px; left:-80px; }
+body.eco .bg-circle-1 { width:500px; height:500px; background:#FDE68A; opacity:0.20; top:-100px; right:-100px; }
+body.eco .bg-circle-2 { width:350px; height:350px; background:#FDE68A; opacity:0.15; bottom:-80px; left:-80px; }
+body.soc .bg-circle-1 { width:500px; height:500px; background:#F59E0B; opacity:0.12; top:-100px; right:-100px; }
+body.soc .bg-circle-2 { width:350px; height:350px; background:#FDE68A; opacity:0.12; bottom:-80px; left:-80px; }
+
+.card {
+  position: relative; z-index: 10;
+  width: 1080px; height: 1080px;
+  display: flex; flex-direction: column;
+}
+
+/* 헤더 */
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 56px; height: 90px;
+  border-bottom: 1.5px solid rgba(180,83,9,0.12);
+  background: rgba(255,255,255,0.6);
+}
+.header-brand { display: flex; align-items: center; gap: 14px; }
+.header-brand img { width: 52px; height: 52px; object-fit: contain; transform: scaleX(-1); }
+.brand-text {
+  font-family: 'Nunito', sans-serif;
+  font-size: 26px; font-weight: 900; letter-spacing: -0.01em;
+}
+.brand-text .do   { color: #78350F; }
+.brand-text .apos { color: #B45309; }
+.brand-text .tory { color: #D97706; }
+.brand-text .news { color: #92400E; font-weight: 700; font-size: 0.7em; letter-spacing: 0.1em; margin-left: 6px; }
+
+/* 날짜 */
+.header-date { font-size: 24px; font-weight: 400; color: #92400E; opacity: 0.65; }
+
+/* 본문 */
+.body { flex: 1; padding: 48px 56px 0; display: flex; flex-direction: column; }
+
+.cat-badge {
+  display: inline-flex; align-items: center;
+  padding: 10px 24px; border-radius: 100px;
+  font-size: 22px; font-weight: 700;
+  font-family: 'Nunito', sans-serif;
+  margin-bottom: 32px; width: fit-content; border: 2px solid;
+}
+body.hot .cat-badge { color: #C2410C; border-color: rgba(194,65,12,0.28); background: rgba(194,65,12,0.08); }
+body.eco .cat-badge { color: #B45309; border-color: rgba(180,83,9,0.3);   background: rgba(180,83,9,0.07); }
+body.soc .cat-badge { color: #7C4012; border-color: rgba(124,64,18,0.28); background: rgba(124,64,18,0.08); }
+
+.headline {
+  font-size: 64px; font-weight: 900;
+  color: #1C0A00; line-height: 1.2;
+  letter-spacing: -0.02em;
+  margin-bottom: 24px; word-break: keep-all;
+}
+
+.accent-line { width: 52px; height: 5px; border-radius: 3px; margin-bottom: 28px; }
+body.hot .accent-line { background: linear-gradient(90deg, #E8472B, #F97316); }
+body.eco .accent-line { background: linear-gradient(90deg, #F59E0B, #D97706); }
+body.soc .accent-line { background: linear-gradient(90deg, #7C4012, #B45309); }
+
+.summary-wrap { flex: 1; overflow: hidden; }
+.summary {
+  font-size: 30px; font-weight: 400;
+  color: #44200A; line-height: 1.8;
+  word-break: keep-all; word-spacing: -0.02em;
+  overflow: hidden;
+}
+
+/* 푸터 */
+.footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 56px; height: 72px; margin-top: 20px;
+  border-top: 1.5px solid rgba(180,83,9,0.1);
+  background: rgba(255,255,255,0.5);
+}
+.source { font-size: 22px; color: #78350F; opacity: 0.7; }
+.source strong { font-weight: 700; opacity: 1; }
+.link-note { font-size: 20px; font-weight: 600; color: #92400E; opacity: 0.8; }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const h = document.querySelector('.headline');
+  const len = h.textContent.trim().length;
+  if (len > 22) h.style.fontSize = '52px';
+  if (len > 30) h.style.fontSize = '44px';
+  if (len > 40) h.style.fontSize = '38px';
+
+  // 요약(summary)이 영역을 넘칠 때만 — 실제로 잘리는 지점에 '···'를 붙임
+  const sum = document.querySelector('.summary');
+  const maxH = sum.parentElement.clientHeight;
+  if (sum.scrollHeight > maxH) {
+    const original = sum.textContent;
+    let lo = 0, hi = original.length;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      sum.textContent = original.slice(0, mid) + '···';
+      if (sum.scrollHeight > maxH) hi = mid - 1;
+      else lo = mid;
+    }
+    sum.textContent = original.slice(0, lo).trimEnd() + '···';
+  }
+});
+</script>
+</head>
+<body class="{{ category }}">
+<div class="top-bar"></div>
+<div class="bg-circle bg-circle-1"></div>
+<div class="bg-circle bg-circle-2"></div>
+
+<div class="card">
+  <div class="header">
+    <div class="header-brand">
+      <img src="{{ acorn_path }}" alt="">
+      <span class="brand-text">
+        <span class="do">DO</span><span class="apos">'s</span>
+        <span class="tory"> TORY</span><span class="news"> NEWS</span>
+      </span>
+    </div>
+    <div class="header-date">{{ date }}</div>
+  </div>
+
+  <div class="body">
+    <div class="cat-badge">{{ cat_label }}</div>
+    <div class="headline">{{ headline }}</div>
+    <div class="accent-line"></div>
+    <div class="summary-wrap"><div class="summary">{{ summary | safe }}</div></div>
+  </div>
+
+  <div class="footer">
+    <div class="source">출처 <strong>{{ source }}</strong></div>
+    <div class="link-note">{{ link_note }}</div>
+  </div>
+</div>
+</body>
+</html>
