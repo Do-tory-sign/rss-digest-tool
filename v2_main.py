@@ -37,7 +37,7 @@ def _curated_filename(slot: str | None) -> str:
 
 
 def _load_today_curated(slot: str | None = None) -> dict:
-    today = datetime.now().strftime("%Y%m%d")
+    today = config.now_kst().strftime("%Y%m%d")
     candidates = [config.OUTPUT_DIR / today / _curated_filename(slot)]
     if not slot:
         # 1순위: 메인 파이프라인의 오늘 큐레이션 (구버전 호환)
@@ -51,7 +51,7 @@ def _load_today_curated(slot: str | None = None) -> dict:
 
 
 def _save_v2_curated(curated: dict, slot: str | None = None):
-    today = datetime.now().strftime("%Y%m%d")
+    today = config.now_kst().strftime("%Y%m%d")
     run_dir = config.OUTPUT_DIR / today
     run_dir.mkdir(parents=True, exist_ok=True)
     with open(run_dir / _curated_filename(slot), "w", encoding="utf-8") as f:
@@ -107,7 +107,7 @@ def build_articles(curated: dict) -> list[dict]:
             print(f"[v2] {cat}: ⚠️ AI 합성 실패 — 규칙 기반 쉬운설명 폴백으로 진행")
 
         # 기사 일러스트 생성 (모든 기사 1장 보장 — 실패 시 카테고리 폴백)
-        today = datetime.now().strftime("%Y%m%d")
+        today = config.now_kst().strftime("%Y%m%d")
         img_name = f"{today}_{cat}.png"
         body_text = " ".join(synth.get("body", [])[:1])  # 첫 문단만
         img_style, img_scene, img_mismatch, img_tone = generate_article_image(
@@ -159,14 +159,14 @@ def _working_data_path(today_key: str | None = None, slot: str | None = None) ->
     review.py / --deploy-only 등 별도 프로세스 간 핸드오프 용도 — 공개 사이트(web/)에는 노출 안 함.
     실제 사이트(web/data.json)는 news_archive.save_today()가 단일 소스로 관리함.
     슬롯이 주어지면 슬롯별 파일로 분리 (하루 4슬롯이 서로 안 덮어쓰게)."""
-    today_key = today_key or datetime.now().strftime("%Y%m%d")
+    today_key = today_key or config.now_kst().strftime("%Y%m%d")
     fname = f"v2_articles_{slot}.json" if slot else "v2_articles.json"
     return config.OUTPUT_DIR / today_key / fname
 
 
 def save_working_data(articles: list[dict], slot: str | None = None) -> Path:
     """v2 합성 결과를 작업용 파일로 저장 (사이트 페이지는 더 만들지 않음 — main.py가 web/data.json에 반영)."""
-    now = datetime.now()
+    now = config.now_kst()
     weekdays = ["월", "화", "수", "목", "금", "토", "일"]
     date_str = f"{now.year}년 {now.month}월 {now.day}일 {weekdays[now.weekday()]}요일"
     payload = {"date": date_str, "updated": now.strftime("%H:%M"), "articles": articles}
@@ -222,7 +222,7 @@ def _send_post_deploy_buttons():
 
     deadline = time.time() + 12 * 60 * 60
     offset = 0
-    today = datetime.now().strftime("%Y%m%d")
+    today = config.now_kst().strftime("%Y%m%d")
     data_path = _working_data_path(today)
     articles = _json.loads(data_path.read_text(encoding="utf-8")).get("articles", []) if data_path.exists() else []
 
@@ -420,7 +420,7 @@ if __name__ == "__main__":
 
         # --deploy-only: 생성 없이 배포만 (승인 플래그 확인)
         if "--deploy-only" in sys.argv:
-            today = datetime.now().strftime("%Y%m%d")
+            today = config.now_kst().strftime("%Y%m%d")
             flag = V2_DIR / f".approved_{today}"
             if not flag.exists():
                 print("[v2] 승인 플래그 없음 — 배포 취소")

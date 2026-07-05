@@ -3,6 +3,8 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+from config import now_kst
+
 DATA_FILE = Path(__file__).parent / "web" / "data.json"
 
 
@@ -25,7 +27,7 @@ def get_week_data() -> list:
     if not DATA_FILE.exists():
         return []
     data = json.loads(DATA_FILE.read_text(encoding="utf-8"))
-    today = datetime.now()
+    today = now_kst()
     week_dates = {
         (today - timedelta(days=i)).strftime("%Y.%m.%d")
         for i in range(1, 7)
@@ -42,7 +44,7 @@ def save_today(curated: dict[str, dict], v2_articles: list[dict] | None = None,
         d = datetime.strptime(date_override, "%Y%m%d")
         today = d.strftime("%Y.%m.%d")
     else:
-        today = datetime.now().strftime("%Y.%m.%d")
+        today = now_kst().strftime("%Y.%m.%d")
     v2_by_cat = {a["category"]: a for a in (v2_articles or [])}
 
     news_items = []
@@ -95,7 +97,7 @@ def save_today(curated: dict[str, dict], v2_articles: list[dict] | None = None,
 
 
 def save_weekly_summary(keywords: dict, week_range: str) -> None:
-    today = datetime.now().strftime("%Y.%m.%d")
+    today = now_kst().strftime("%Y.%m.%d")
 
     entry = {
         "date": today,

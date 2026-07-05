@@ -1,8 +1,21 @@
 import os
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 
 load_dotenv(dotenv_path=Path(__file__).parent / ".env", encoding="utf-8", override=True)
+
+KST = ZoneInfo("Asia/Seoul")
+
+
+def now_kst() -> datetime:
+    """한국 시간 기준 현재 시각.
+    2026-07-06: GitHub Actions 러너는 UTC로 동작해서, 예전처럼 datetime.now()를 그대로 쓰면
+    한국 기준 새벽~아침(UTC로는 아직 전날) 시간대에 날짜가 하루 밀려서 표시되고, 그 날짜를
+    파일명 키로 쓰는 이미지/데이터 경로까지 전날 것과 충돌하는 문제가 있었음(로컬 PC는 항상
+    KST라 이 버그가 지금까지 안 보였음). 파일명/화면 표시용 '오늘'은 전부 이 함수로 통일."""
+    return datetime.now(KST)
 
 BASE_DIR = Path(__file__).parent
 

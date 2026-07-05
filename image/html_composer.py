@@ -3,6 +3,7 @@ import base64
 from pathlib import Path
 from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
+from config import now_kst
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 # 2026-07-05: 예전엔 사용자 로컬 PC의 절대경로(C:/Users/.../cardnews/assets/...)로 하드코딩돼
@@ -67,9 +68,9 @@ def compose_cover(
     keywords: dict = None,
 ) -> Path:
     if output_path is None:
-        output_path = Path(f"output/cover_{datetime.now().strftime('%Y%m%d')}.png")
+        output_path = Path(f"output/cover_{now_kst().strftime('%Y%m%d')}.png")
 
-    now = datetime.now()
+    now = now_kst()
     days = ["월", "화", "수", "목", "금", "토", "일"]
 
     h = headlines or {}
@@ -102,7 +103,7 @@ def compose_profile_intro(output_path: Path = None) -> Path:
 
 def compose_outro(output_path: Path = None) -> Path:
     if output_path is None:
-        output_path = Path(f"output/outro_{datetime.now().strftime('%Y%m%d')}.png")
+        output_path = Path(f"output/outro_{now_kst().strftime('%Y%m%d')}.png")
 
     tmpl = env.get_template("outro.html")
     html = tmpl.render(acorn_path=_acorn_base64())
@@ -128,9 +129,9 @@ def compose_cover_v2(
     """B안 커버 — v2 일러스트 풀블리드 배경 + 텍스트 오버레이.
     date_override: 'YYYYMMDD' 형식으로 지정하면 해당 날짜로 표시 (백필용)"""
     if output_path is None:
-        output_path = Path(f"output/cover_{datetime.now().strftime('%Y%m%d')}.png")
+        output_path = Path(f"output/cover_{now_kst().strftime('%Y%m%d')}.png")
 
-    now = datetime.strptime(date_override, "%Y%m%d") if date_override else datetime.now()
+    now = datetime.strptime(date_override, "%Y%m%d") if date_override else now_kst()
     days = ["월", "화", "수", "목", "금", "토", "일"]
 
     h = headlines or {}
@@ -162,9 +163,9 @@ def compose_story_v2(
     """피드 게시물 업로드 후 자동 공유용 스토리 이미지 (1080x1920) —
     풀블리드 배경 + '프로필에서 확인하세요' 안내 문구. 인터랙티브 스티커 없이 텍스트로 디자인."""
     if output_path is None:
-        output_path = Path(f"output/story_{datetime.now().strftime('%Y%m%d')}.png")
+        output_path = Path(f"output/story_{now_kst().strftime('%Y%m%d')}.png")
 
-    now = datetime.strptime(date_override, "%Y%m%d") if date_override else datetime.now()
+    now = datetime.strptime(date_override, "%Y%m%d") if date_override else now_kst()
 
     if not image_path or not Path(image_path).exists():
         return None
@@ -190,14 +191,14 @@ def compose_card_v2(
     """A안 기사 카드 — 상단 이미지(55%) + 하단 텍스트(45%).
     date_override: 'YYYYMMDD' 형식으로 지정하면 해당 날짜로 표시 (백필용)"""
     if output_path is None:
-        output_path = Path(f"output/{category}_{datetime.now().strftime('%Y%m%d')}.png")
+        output_path = Path(f"output/{category}_{now_kst().strftime('%Y%m%d')}.png")
 
     if not Path(image_path).exists():
         # 이미지 없으면 기존 카드로 폴백
         return compose_card(category, headline, lead, source, output_path=output_path)
 
     image_src = _image_base64(image_path)
-    date_str = (datetime.strptime(date_override, "%Y%m%d") if date_override else datetime.now()).strftime("%Y.%m.%d")
+    date_str = (datetime.strptime(date_override, "%Y%m%d") if date_override else now_kst()).strftime("%Y.%m.%d")
 
     tmpl = env.get_template("card_v2.html")
     html = tmpl.render(
@@ -239,7 +240,7 @@ def compose_cover_explain(
     pose_path: 도토리 표정 자동매칭(news/character.py)으로 고른 포즈 이미지. 없으면 표정 배지 생략."""
     image_src = _image_base64(image_path) if image_path and Path(image_path).exists() else ""
     acorn_path = _acorn_base64(pose_path) if pose_path and Path(pose_path).exists() else ""
-    now = datetime.now()
+    now = now_kst()
     days = ["월", "화", "수", "목", "금", "토", "일"]
     tmpl = env.get_template("cover_explain.html")
     html = tmpl.render(
@@ -301,7 +302,7 @@ def compose_explain_card(
 
 def compose_weekly(category: str, week_rows: list, week_range: str, output_path: Path = None) -> Path:
     if output_path is None:
-        output_path = Path(f"output/weekly_{category}_{datetime.now().strftime('%Y%m%d')}.png")
+        output_path = Path(f"output/weekly_{category}_{now_kst().strftime('%Y%m%d')}.png")
 
     tmpl = env.get_template("weekly.html")
     html = tmpl.render(
@@ -324,7 +325,7 @@ def compose_card(
     link_note: str = "원문은 프로필 링크에",
 ) -> Path:
     if output_path is None:
-        output_path = Path(f"output/{category}_{datetime.now().strftime('%Y%m%d')}.png")
+        output_path = Path(f"output/{category}_{now_kst().strftime('%Y%m%d')}.png")
 
     summary = summary.rstrip()
     summary_html = _split_paragraphs(summary)
@@ -334,7 +335,7 @@ def compose_card(
         category=CAT_CLASS.get(category, "hot"),
         cat_label=CAT_LABELS.get(category, category),
         acorn_path=_acorn_base64(ACORN_ICON_PATH),
-        date=datetime.now().strftime("%Y.%m.%d"),
+        date=now_kst().strftime("%Y.%m.%d"),
         headline=headline,
         summary=summary_html,
         source=source,

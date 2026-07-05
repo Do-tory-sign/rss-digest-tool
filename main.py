@@ -213,7 +213,7 @@ def regenerate_single_card(slot: str, card_name: str) -> Path | None:
     """카드 중 하나만(cover/fact/viewpoint/why/outlook) 다시 렌더링해 같은 파일 경로에 덮어쓴다.
     2026-07-02: 텔레그램 카드 승인 단계에서 "이 카드만 재생성" 버튼용으로 추가.
     2026-07-03: viewpoint(서로 다른 시각) 지원 추가 — 처음엔 빠져있어서 재생성이 안 됐음."""
-    today = datetime.now().strftime("%Y%m%d")
+    today = config.now_kst().strftime("%Y%m%d")
     run_dir = config.OUTPUT_DIR / today
     data, article = _load_v2_data(run_dir, slot)
     if not data or not article:
@@ -277,7 +277,7 @@ def run(slot: str, dry_run: bool = False, publish_only: bool = False) -> bool:
     성공하면 True, 실패하면 False.
     publish_only=True: 카드 생성은 건너뛰고(이미 승인받은 기존 이미지 재사용) 배포/업로드만 진행
     (2026-07-02: 텔레그램 카드 승인 후 슬롯 :55에 실제 배포하는 2단계 흐름용)."""
-    today = datetime.now().strftime("%Y%m%d")
+    today = config.now_kst().strftime("%Y%m%d")
     run_dir = config.OUTPUT_DIR / today
     run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -384,7 +384,7 @@ def run(slot: str, dry_run: bool = False, publish_only: bool = False) -> bool:
             except Exception:
                 pass
 
-    done_flag.write_text(datetime.now().isoformat(), encoding="utf-8")
+    done_flag.write_text(config.now_kst().isoformat(), encoding="utf-8")
     print(f"\n✅ 카드뉴스 빌드 완료! [{slot}]")
     return upload_ok
 
