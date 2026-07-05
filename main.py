@@ -345,38 +345,44 @@ def run(slot: str, dry_run: bool = False, publish_only: bool = False) -> bool:
     # 셀레니움 브라우저 자동화)이라 동시에 돌리면 크롬 세션 충돌 위험만 커서 순차로 진행한다.
     # 2026-07-02: 기본은 임시저장까지만(자동 발행 안 함) — 사람이 최종 확인 후 네이버에서
     # 직접 발행하는 게 안전하다는 기존 원칙 유지.
-    try:
-        print("\n[main] 블로그 초안 작성 중...")
-        blog_dir = Path(__file__).parent / "blog"
-        draft_result = subprocess.run(
-            [sys.executable, "-X", "utf8", "dotory_blog_draft.py", "--slot", slot],
-            cwd=blog_dir, capture_output=True, text=True,
-        )
-        draft_path = None
-        for line in draft_result.stdout.splitlines():
-            if line.startswith("[BLOG_DRAFT]"):
-                draft_path = line.split("[BLOG_DRAFT]", 1)[1].strip()
-        if draft_path:
-            publish_result = subprocess.run(
-                [sys.executable, "-X", "utf8", "dotory_blog_publish.py", "--draft", draft_path],
-                cwd=blog_dir,
+    import os
+    if os.environ.get("SKIP_BLOG") == "1":
+        # 2026-07-06: 클라우드(GitHub Actions) 런너에는 네이버 로그인 세션이 없음(Phase 2
+        # 쿠키 자동화 미구현) — 사이트+인스타만 여기서 처리하고, 블로그는 로컬에서 별도 실행.
+        print("\n[main] SKIP_BLOG=1 — 블로그 단계 건너뜀 (로컬에서 별도 처리 필요)")
+    else:
+        try:
+            print("\n[main] 블로그 초안 작성 중...")
+            blog_dir = Path(__file__).parent / "blog"
+            draft_result = subprocess.run(
+                [sys.executable, "-X", "utf8", "dotory_blog_draft.py", "--slot", slot],
+                cwd=blog_dir, capture_output=True, text=True,
             )
-            if publish_result.returncode != 0:
-                print(f"[main] 블로그 발행 단계 실패 (exit code {publish_result.returncode})")
-        else:
-            print(f"[main] 블로그 초안 생성 실패:\n{draft_result.stdout}\n{draft_result.stderr}")
+            draft_path = None
+            for line in draft_result.stdout.splitlines():
+                if line.startswith("[BLOG_DRAFT]"):
+                    draft_path = line.split("[BLOG_DRAFT]", 1)[1].strip()
+            if draft_path:
+                publish_result = subprocess.run(
+                    [sys.executable, "-X", "utf8", "dotory_blog_publish.py", "--draft", draft_path],
+                    cwd=blog_dir,
+                )
+                if publish_result.returncode != 0:
+                    print(f"[main] 블로그 발행 단계 실패 (exit code {publish_result.returncode})")
+            else:
+                print(f"[main] 블로그 초안 생성 실패:\n{draft_result.stdout}\n{draft_result.stderr}")
+                try:
+                    from notify import notify_failure
+                    notify_failure(f"블로그 초안 생성 실패({slot}) — dotory_blog_draft.py 자체가 실패함")
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"[main] 블로그 단계 실패(건너뜀): {e}")
             try:
                 from notify import notify_failure
-                notify_failure(f"블로그 초안 생성 실패({slot}) — dotory_blog_draft.py 자체가 실패함")
+                notify_failure(f"블로그 단계 예외로 중단({slot}): {e}")
             except Exception:
                 pass
-    except Exception as e:
-        print(f"[main] 블로그 단계 실패(건너뜀): {e}")
-        try:
-            from notify import notify_failure
-            notify_failure(f"블로그 단계 예외로 중단({slot}): {e}")
-        except Exception:
-            pass
 
     done_flag.write_text(datetime.now().isoformat(), encoding="utf-8")
     print(f"\n✅ 카드뉴스 빌드 완료! [{slot}]")

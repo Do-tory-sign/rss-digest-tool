@@ -73,18 +73,40 @@ def _deploy_images(image_paths: list) -> list[str]:
     return urls
 
 
+CDN_PROPAGATION_RETRY_WAITS = [20, 40, 60]  # 2026-07-05: Firebase 배포 직후 CDN 전파가
+# 안 끝난 상태에서 인스타가 먼저 이미지를 가져오려다 실패(code 9004, "미디어를 가져올 수
+# 없음")하는 게 반복적으로 발생 — 파일 자체는 몇십 초 뒤면 항상 정상이었음(수동으로 curl
+# 확인해보면 200으로 바뀜). 매번 사람이 몇 분 기다렸다 수동 재시도하던 걸 자동화.
+
+
+def _is_media_fetch_transient_error(res: dict) -> bool:
+    err = res.get("error", {})
+    return err.get("code") == 9004 and err.get("error_subcode") == 2207052
+
+
 def _create_item_container(ig_user_id: str, token: str, image_url: str) -> str | None:
-    """캐러셀 개별 이미지 컨테이너 생성"""
+    """캐러셀 개별 이미지 컨테이너 생성. CDN 전파 지연으로 추정되는 일시적 실패(code 9004)는
+    잠깐 기다렸다가 자동으로 재시도한다."""
     url = f"{GRAPH}/{ig_user_id}/media"
-    res = _post(url, {
-        "image_url": image_url,
-        "is_carousel_item": "true",
-        "access_token": token,
-    })
-    container_id = res.get("id")
-    if not container_id:
+    attempts = len(CDN_PROPAGATION_RETRY_WAITS) + 1
+    for attempt in range(attempts):
+        res = _post(url, {
+            "image_url": image_url,
+            "is_carousel_item": "true",
+            "access_token": token,
+        })
+        container_id = res.get("id")
+        if container_id:
+            return container_id
+        if _is_media_fetch_transient_error(res) and attempt < len(CDN_PROPAGATION_RETRY_WAITS):
+            wait = CDN_PROPAGATION_RETRY_WAITS[attempt]
+            print(f"[graph] 미디어 가져오기 실패(CDN 전파 지연 추정) — {wait}초 후 재시도 "
+                  f"({attempt + 1}/{len(CDN_PROPAGATION_RETRY_WAITS)})")
+            time.sleep(wait)
+            continue
         print(f"[graph] 컨테이너 생성 실패: {res}")
-    return container_id
+        return None
+    return None
 
 
 def _create_carousel_container(ig_user_id: str, token: str, children: list[str], caption: str) -> str | None:

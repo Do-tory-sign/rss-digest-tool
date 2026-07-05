@@ -23,6 +23,7 @@ jobs:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       BRAND_NAME: ${{ secrets.BRAND_NAME }}
+      SKIP_BLOG: "1"
     steps:
       - uses: actions/checkout@v4
 
@@ -79,6 +80,13 @@ jobs:
         shell: pwsh
         run: |
           python -X utf8 main.py --slot ${{ steps.slot.outputs.slot }} --publish-only
+
+      - name: 승인된 카드 이미지 업로드 (블로그는 로컬에서 처리 — 다운로드용)
+        uses: actions/upload-artifact@v4
+        with:
+          name: approved-cards-${{ steps.slot.outputs.slot }}
+          path: D:/Dotory/Cardnews/output
+          retention-days: 2
 
       - name: 민감 파일 정리
         if: always()

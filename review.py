@@ -428,34 +428,72 @@ def _regen_card(card_name: str):
         print(f"[review] 재생성 카드 전송 실패: {e}")
 
 
+def _schedule_publish_task(publish_at: datetime) -> bool:
+    """Windows 작업 스케줄러에 슬롯:55 1회성 작업을 등록해 scheduled_publish.py를 그 시각에
+    실행시킨다. review.py 프로세스의 생존 여부와 무관하게 OS가 실행을 보장한다."""
+    task_name = f"DotoryPublish_{_slot}"
+    script_dir = Path(__file__).resolve().parent
+    cmd = f'"{sys.executable}" -X utf8 scheduled_publish.py --slot {_slot}'
+    tr = f'cmd /c "cd /d {script_dir} && {cmd}"'
+    args = [
+        "schtasks", "/create", "/tn", task_name, "/tr", tr,
+        "/sc", "once",
+        "/sd", publish_at.strftime("%Y/%m/%d"),  # 한국어 Windows 로캘 기준 날짜 형식
+        "/st", publish_at.strftime("%H:%M"),
+        "/f",  # 같은 이름 있으면 덮어씀
+    ]
+    # schtasks는 한국어 Windows에서 콘솔 코드페이지(cp949)로 출력하므로 utf-8로 그대로
+    # 디코딩하면 깨짐 — errors="replace"로 안전하게 받는다.
+    result = subprocess.run(args, capture_output=True, text=True, encoding="cp949", errors="replace")
+    if result.returncode != 0:
+        print(f"[review] 작업 스케줄러 등록 실패: {(result.stderr or '').strip()}")
+        return False
+    print(f"[review] 작업 스케줄러에 '{task_name}' 등록 완료 ({publish_at:%m/%d %H:%M})")
+    return True
+
+
 def _wait_until_slot_deadline_and_publish():
-    """카드 승인 이후, 슬롯 시각:55가 될 때까지 기다렸다가(이미 지났으면 즉시) main.py
-    --publish-only로 실제 배포(사이트+인스타+블로그)를 진행한다."""
+    """카드 승인 이후 슬롯 시각:55에 배포되도록 처리한다.
+    2026-07-05: 예전엔 이 프로세스가 time.sleep(wait_sec)로 직접 몇십 분을 대기하다가
+    main.py --publish-only를 호출했는데, 그 사이 프로세스가 죽으면(강제종료·PC 절전·크래시
+    등 — 실제로 07-05 저녁한입에서 발생) 배포가 통째로 누락되고 알림도 없었음. 이제는
+    Windows 작업 스케줄러에 정확한 시각의 1회성 작업(scheduled_publish.py 실행)을 등록만
+    해두고 이 프로세스는 바로 끝난다 — review.py가 살아있지 않아도 OS가 대신 실행해준다.
+    단, 마감이 이미 지났으면(캐치업 등) 예약할 필요 없이 바로 배포한다."""
     from notify import send
     from daily_runner import SLOT_CONFIG  # 시각 매핑을 여기 따로 하드코딩하면 나중에 어긋날 위험 — 단일 소스 참조
     cfg_hour = SLOT_CONFIG[_slot]["hour"]
     publish_at = datetime.now().replace(hour=cfg_hour, minute=55, second=0, microsecond=0)
     now = datetime.now()
-    if now < publish_at:
-        wait_sec = (publish_at - now).total_seconds()
-        print(f"[review] 카드 승인 완료 — {publish_at:%H:%M}까지 대기 ({int(wait_sec)}초)")
-        send(f"✅ 카드뉴스 승인 완료! {publish_at:%H:%M}에 인스타+블로그 업로드할게요.")
-        time.sleep(wait_sec)
-    else:
-        print("[review] 카드 승인 시점에 이미 게시 시각 지남 — 즉시 배포")
 
-    print(f"[review] [{_slot}] 실제 배포 진행 (--publish-only)")
-    args = [sys.executable, "-X", "utf8", "main.py", "--slot", _slot, "--publish-only"]
-    result = subprocess.run(args, cwd=Path(__file__).parent)
-    if result.returncode == 0:
-        # 2026-07-04: 여기서 "인스타+블로그 완료"라고 뭉뚱그려 보내던 게 거짓 성공 알림이었음
-        # — main.py는 인스타 성공/실패만 반영해 종료코드를 냈고, 블로그 단계는 결과를 전혀
-        # 확인 안 했음(크롬이 아예 안 열려있어도 그냥 넘어감). 블로그는 dotory_blog_publish.py가
-        # 스스로 성공/로그인필요 등 정확한 알림을 별도로 보내므로, 여기서는 인스타/사이트만 언급.
-        send(f"✅ 도토리뉴스 [{_slot}] 사이트+인스타 업로드 완료! (블로그는 별도 알림 확인)")
+    if now >= publish_at:
+        print("[review] 카드 승인 시점에 이미 게시 시각 지남 — 즉시 배포")
+        args = [sys.executable, "-X", "utf8", "main.py", "--slot", _slot, "--publish-only"]
+        result = subprocess.run(args, cwd=Path(__file__).parent)
+        if result.returncode == 0:
+            send(f"✅ 도토리뉴스 [{_slot}] 사이트+인스타 업로드 완료! (블로그는 별도 알림 확인)")
+        else:
+            send(f"⚠️ [{_slot}] 배포 실패 (exit code {result.returncode}) — 로그 확인 필요")
+        return result.returncode == 0
+
+    print(f"[review] 카드 승인 완료 — {publish_at:%H:%M}에 배포되도록 작업 스케줄러 등록")
+    if _schedule_publish_task(publish_at):
+        send(f"✅ 카드뉴스 승인 완료! {publish_at:%H:%M}에 인스타+블로그 업로드할게요 "
+             f"(작업 스케줄러 예약 — 이 창을 꺼도 진행돼요).")
+        return True
     else:
-        send(f"⚠️ [{_slot}] 배포 실패 (exit code {result.returncode}) — 로그 확인 필요")
-    return result.returncode == 0
+        # 스케줄 등록 자체가 실패하면 기존 방식(직접 대기)으로 폴백 — 최소한 이번 한 번은 보장
+        wait_sec = (publish_at - now).total_seconds()
+        print(f"[review] 스케줄 등록 실패 — 기존 방식으로 직접 대기 ({int(wait_sec)}초)")
+        send(f"⚠️ 작업 스케줄러 등록 실패 — 이 창을 계속 켜두셔야 {publish_at:%H:%M}에 배포돼요.")
+        time.sleep(wait_sec)
+        args = [sys.executable, "-X", "utf8", "main.py", "--slot", _slot, "--publish-only"]
+        result = subprocess.run(args, cwd=Path(__file__).parent)
+        if result.returncode == 0:
+            send(f"✅ 도토리뉴스 [{_slot}] 사이트+인스타 업로드 완료! (블로그는 별도 알림 확인)")
+        else:
+            send(f"⚠️ [{_slot}] 배포 실패 (exit code {result.returncode}) — 로그 확인 필요")
+        return result.returncode == 0
 
 
 def run_card_approval() -> bool:
