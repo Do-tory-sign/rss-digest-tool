@@ -32,9 +32,11 @@ sys.path.insert(0, str(ROOT))
 
 load_dotenv(dotenv_path=ROOT / ".env", encoding="utf-8", override=True)
 
+from config import now_kst
+
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
-TODAY = datetime.now().strftime("%Y%m%d")
+TODAY = now_kst().strftime("%Y%m%d")
 
 CAT_LABEL = {"hot": "🔥 핫뉴스", "economy": "💰 경제·IT", "culture": "🎵 트렌드"}
 CARD_NAMES = ["cover", "fact", "viewpoint", "why", "outlook"]
