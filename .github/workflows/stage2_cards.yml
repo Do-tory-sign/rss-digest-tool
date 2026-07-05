@@ -57,7 +57,9 @@ jobs:
       - name: 오늘자 산출물 복원 (Stage 1 캐시)
         uses: actions/cache/restore@v4
         with:
-          path: D:/Dotory/Cardnews/output
+          path: |
+            D:/Dotory/Cardnews/output
+            web/v2/img
           key: dotory-output-${{ github.run_id }}-nokey  # 아래 restore-keys로 최신 일치 항목을 사용
           restore-keys: |
             dotory-output-
@@ -70,7 +72,9 @@ jobs:
       - name: 산출물 캐시 저장 (Stage 3에서 이어받기 위함)
         uses: actions/cache/save@v4
         with:
-          path: D:/Dotory/Cardnews/output
+          path: |
+            D:/Dotory/Cardnews/output
+            web/v2/img
           key: dotory-output-${{ github.run_id }}
 
       - name: 텔레그램 카드 승인 요청 전송

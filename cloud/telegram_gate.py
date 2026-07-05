@@ -179,7 +179,8 @@ def cmd_send_cards(args):
     )
     markup = {
         "inline_keyboard": [
-            [{"text": "✅ 전체승인 → 배포", "callback_data": f"card_approve|{slot}"}],
+            [{"text": "✅ 전체승인 → 배포", "callback_data": f"card_approve|{slot}"},
+             {"text": "❌ 전체 반려 (오늘 이 슬롯 취소)", "callback_data": f"card_reject|{slot}"}],
             *regen_rows,
         ]
     }

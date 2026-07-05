@@ -60,7 +60,9 @@ jobs:
       - name: Stage 2가 만든 승인된 카드 이미지 복원
         uses: actions/cache/restore@v4
         with:
-          path: D:/Dotory/Cardnews/output
+          path: |
+            D:/Dotory/Cardnews/output
+            web/v2/img
           key: dotory-output-nokey
           restore-keys: |
             dotory-output-
@@ -85,7 +87,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: approved-cards-${{ steps.slot.outputs.slot }}
-          path: D:/Dotory/Cardnews/output
+          path: |
+            D:/Dotory/Cardnews/output
+            web/v2/img
           retention-days: 2
 
       - name: 민감 파일 정리

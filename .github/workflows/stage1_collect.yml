@@ -96,5 +96,7 @@ jobs:
         if: always()
         uses: actions/cache/save@v4
         with:
-          path: D:/Dotory/Cardnews/output
+          path: |
+            D:/Dotory/Cardnews/output
+            web/v2/img
           key: dotory-output-${{ github.run_id }}

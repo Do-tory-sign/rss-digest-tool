@@ -31,7 +31,9 @@ jobs:
       - name: Stage 2 산출물 복원
         uses: actions/cache/restore@v4
         with:
-          path: D:/Dotory/Cardnews/output
+          path: |
+            D:/Dotory/Cardnews/output
+            web/v2/img
           key: dotory-output-nokey
           restore-keys: |
             dotory-output-
@@ -53,5 +55,7 @@ jobs:
       - name: 갱신된 산출물 재저장
         uses: actions/cache/save@v4
         with:
-          path: D:/Dotory/Cardnews/output
+          path: |
+            D:/Dotory/Cardnews/output
+            web/v2/img
           key: dotory-output-${{ github.run_id }}

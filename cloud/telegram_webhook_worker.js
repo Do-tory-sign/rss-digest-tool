@@ -57,6 +57,7 @@ export default {
       art_reject: "article_rejected",
       card_approve: "cards_approved",
       card_regen: "card_regen",
+      card_reject: "cards_rejected",
     };
     const eventType = EVENT_MAP[action];
 
@@ -72,7 +73,7 @@ export default {
 
     // 버튼 눌린 메시지의 인라인 키보드 제거(중복 클릭 방지) — art_regen/card_regen은
     // 여러 카드에 각각 버튼이 있으므로 지우지 않고 그대로 둔다(다른 카드 재생성도 눌러야 하니까).
-    if (action === "art_approve" || action === "art_reject" || action === "card_approve") {
+    if (action === "art_approve" || action === "art_reject" || action === "card_approve" || action === "card_reject") {
       await telegramApi(env, "editMessageReplyMarkup", {
         chat_id: chatId,
         message_id: messageId,
