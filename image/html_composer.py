@@ -5,9 +5,13 @@ from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
-ACORN_PATH            = Path("C:/Users/또야/Documents/Do.tory/cardnews/assets/dotory_news.png")
-ACORN_ICON_PATH       = Path("C:/Users/또야/Documents/Do.tory/cardnews/assets/favicon_acorn_transparent.png")
-ACORN_ICON_RIGHT_PATH = Path("C:/Users/또야/Documents/Do.tory/cardnews/assets/favicon_acorn_우측_transparent.png")
+# 2026-07-05: 예전엔 사용자 로컬 PC의 절대경로(C:/Users/.../cardnews/assets/...)로 하드코딩돼
+# 있어서 GitHub Actions 클라우드 러너(체크아웃 경로가 완전히 다름)에서 파일을 못 찾아 카드
+# 생성이 통째로 실패했음 — 저장소 안의 assets/ 폴더를 __file__ 기준 상대경로로 참조하도록 수정.
+ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
+ACORN_PATH            = ASSETS_DIR / "dotory_news.png"
+ACORN_ICON_PATH       = ASSETS_DIR / "favicon_acorn_transparent.png"
+ACORN_ICON_RIGHT_PATH = ASSETS_DIR / "favicon_acorn_우측_transparent.png"
 
 env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)))
 
@@ -74,7 +78,7 @@ def compose_cover(
     html = tmpl.render(
         acorn_path=_acorn_base64(),
         date_badge=now.strftime("%Y.%m.%d"),
-        date_main=f"{now.strftime('%Y년 %m월 %d일')} ({days[now.weekday()]})",
+        date_main=f"{now.year}년 {now.month}월 {now.day}일 ({days[now.weekday()]})",  # Windows strftime 로케일 인코딩 버그 회피(2026-07-05)
         hot_headline=h.get("hot", {}).get("cover_headline") or h.get("hot", {}).get("card_headline", ""),
         eco_headline=h.get("economy", {}).get("cover_headline") or h.get("economy", {}).get("card_headline", ""),
         trd_headline=h.get("culture", {}).get("cover_headline") or h.get("culture", {}).get("card_headline", ""),
@@ -142,7 +146,7 @@ def compose_cover_v2(
         acorn_path=_acorn_base64(),
         image_src=image_src,
         date_badge=now.strftime("%Y.%m.%d"),
-        date_main=f"{now.strftime('%Y년 %m월 %d일')} ({days[now.weekday()]})",
+        date_main=f"{now.year}년 {now.month}월 {now.day}일 ({days[now.weekday()]})",  # Windows strftime 로케일 인코딩 버그 회피(2026-07-05)
         hot_headline=h.get("hot", {}).get("cover_headline") or h.get("hot", {}).get("card_headline", ""),
         eco_headline=h.get("economy", {}).get("cover_headline") or h.get("economy", {}).get("card_headline", ""),
         trd_headline=h.get("culture", {}).get("cover_headline") or h.get("culture", {}).get("card_headline", ""),
@@ -242,7 +246,7 @@ def compose_cover_explain(
         image_src=image_src,
         slot_title=SLOT_TITLES.get(slot, "오늘의 뉴스"),
         date_badge=now.strftime("%Y.%m.%d"),
-        date_main=f"{now.strftime('%Y년 %m월 %d일')} ({days[now.weekday()]})",
+        date_main=f"{now.year}년 {now.month}월 {now.day}일 ({days[now.weekday()]})",  # Windows strftime 로케일 인코딩 버그 회피(2026-07-05)
         cat_label=CAT_LABELS.get(category, category),
         headline=headline,
         acorn_path=acorn_path,
