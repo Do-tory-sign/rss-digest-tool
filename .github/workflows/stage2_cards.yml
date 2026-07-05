@@ -33,6 +33,9 @@ jobs:
       - name: 의존성 설치
         run: pip install -r requirements.txt
 
+      - name: Playwright 브라우저 설치 (카드 이미지 렌더링용)
+        run: playwright install --with-deps chromium
+
       - name: D 드라이브 출력 폴더 준비
         shell: pwsh
         run: New-Item -ItemType Directory -Force -Path "D:/Dotory/Cardnews/output" | Out-Null

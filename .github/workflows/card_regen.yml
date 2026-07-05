@@ -22,6 +22,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -r requirements.txt
+      - run: playwright install --with-deps chromium
 
       - name: D 드라이브 출력 폴더 준비
         shell: pwsh
