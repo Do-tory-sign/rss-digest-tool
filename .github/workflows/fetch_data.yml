@@ -1,0 +1,31 @@
+name: "산출물 JSON 백업 (블로그 복구용, 수동 실행 전용)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: "슬롯"
+        required: true
+        type: choice
+        options: [morning, lunch, evening, night]
+
+jobs:
+  fetch:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 오늘자 산출물 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            D:/Dotory/Cardnews/output
+            web/v2/img
+          key: dotory-output-nokey
+          restore-keys: |
+            dotory-output-
+      - name: JSON만 아티팩트로 업로드
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-json-${{ inputs.slot }}
+          path: D:/Dotory/Cardnews/output
+          retention-days: 1
