@@ -62,6 +62,16 @@ def main() -> int:
 
     settings = load_illua_settings()
     if not settings.naver_id.strip():
+        # 2026-07-06: 설정 파일(dotory_blofit_settings.json)은 .gitignore 대상이라 클라우드
+        # 러너엔 없음 — 블로그 ID 자체는 공개된 값(blog.naver.com/dotory_news)이라 민감정보가
+        # 아니므로 환경변수(NAVER_BLOG_ID, GitHub Secret)로 대체 가능하게 함.
+        import os
+        env_id = os.environ.get("NAVER_BLOG_ID", "").strip()
+        if env_id:
+            settings.naver_id = env_id
+            if not settings.naver_login_id:
+                settings.naver_login_id = env_id
+    if not settings.naver_id.strip():
         print("[BLOG] ⚠️ 네이버 블로그 ID가 등록되지 않았습니다.")
         print("       먼저: python dotory_blog_publish.py --set-id <네이버블로그ID>")
         return 2

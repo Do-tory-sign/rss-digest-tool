@@ -24,6 +24,7 @@ jobs:
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       BRAND_NAME: ${{ secrets.BRAND_NAME }}
       NAVER_COOKIES_JSON: ${{ secrets.NAVER_COOKIES_JSON }}
+      NAVER_BLOG_ID: ${{ secrets.NAVER_BLOG_ID }}
     steps:
       - uses: actions/checkout@v4
 
