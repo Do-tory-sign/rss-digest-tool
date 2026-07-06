@@ -4,10 +4,10 @@ name: "Stage 1 - 뉴스 수집 + 기사 승인 요청"
 # cron은 UTC 기준이므로 9시간을 빼서 등록한다: 06,11,16,21 KST -> 21(전날),02,07,12 UTC
 on:
   schedule:
-    - cron: "0 21 * * *"   # 06:00 KST (전날 21:00 UTC) -> morning
-    - cron: "0 2  * * *"   # 11:00 KST -> lunch
-    - cron: "0 7  * * *"   # 16:00 KST -> evening
-    - cron: "0 12 * * *"   # 21:00 KST -> night
+    - cron: "0 21 * * *"  # 06:00 KST (전날 21:00 UTC) -> morning
+    - cron: "0 2 * * *"   # 11:00 KST -> lunch
+    - cron: "0 7 * * *"   # 16:00 KST -> evening
+    - cron: "0 12 * * *"  # 21:00 KST -> night
   workflow_dispatch:
     inputs:
       slot:
@@ -41,7 +41,11 @@ jobs:
             # 있었음(07-06 저녁 cron이 06:39 UTC에 시작 -> hour=6이라 미스매치 -> morning으로
             # 잘못 실행됨). github.event.schedule은 실행 시각과 무관하게 "어떤 cron
             # 표현식이 이 실행을 매칭시켰는지"를 그대로 알려주므로 이걸 직접 매칭한다.
-            switch ("${{ github.event.schedule }}") {
+            # 2026-07-06 후속 버그: cron 필드 사이 공백이 YAML에서 정렬용으로 2칸인 것도
+            # 있어서("0 2  * * *") 문자열을 그대로 비교하면 미스매치가 남 — 공백을 1칸으로
+            # 정규화한 뒤 비교한다(이 버그로 저녁/점심 cron이 또 morning으로 잘못 떨어졌었음).
+            $sched = ("${{ github.event.schedule }}" -replace '\s+', ' ').Trim()
+            switch ($sched) {
               "0 21 * * *" { $slot = "morning" }
               "0 2 * * *"  { $slot = "lunch" }
               "0 7 * * *"  { $slot = "evening" }
