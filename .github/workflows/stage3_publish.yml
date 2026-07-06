@@ -23,7 +23,7 @@ jobs:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       BRAND_NAME: ${{ secrets.BRAND_NAME }}
-      SKIP_BLOG: "1"
+      NAVER_COOKIES_JSON: ${{ secrets.NAVER_COOKIES_JSON }}
     steps:
       - uses: actions/checkout@v4
 
@@ -77,6 +77,12 @@ jobs:
         run: |
           Set-Content -Path "firebase_service_account.json" -Value '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}' -Encoding utf8NoBOM
           echo "GOOGLE_APPLICATION_CREDENTIALS=$pwd/firebase_service_account.json" >> $env:GITHUB_ENV
+
+      - name: 네이버 로그인 복원 (쿠키 주입 — 2026-07-06 실험적 도입)
+        shell: pwsh
+        run: |
+          python -X utf8 cloud/naver_cookie_login.py
+        continue-on-error: true  # 실패해도(IP 이상탐지 등) main.py가 블로그만 실패 처리하고 사이트+인스타는 정상 진행되게 함
 
       - name: 실제 배포 (main.py --publish-only 그대로 재사용 — 사이트+인스타+블로그)
         shell: pwsh

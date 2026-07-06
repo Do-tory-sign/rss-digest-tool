@@ -25,6 +25,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import config  # noqa: E402
+from config import now_kst  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent
 V2_DIR = ROOT.parent / "web" / "v2"
@@ -32,7 +33,7 @@ OUT_DIR = ROOT / "drafts"
 
 
 def _load_article(slot: str) -> tuple[dict, dict]:
-    today = datetime.now().strftime("%Y%m%d")
+    today = now_kst().strftime("%Y%m%d")
     run_dir = config.OUTPUT_DIR / today
     curated_path = run_dir / f"v2_curated_{slot}.json"
     articles_path = run_dir / f"v2_articles_{slot}.json"
@@ -46,7 +47,7 @@ def _load_article(slot: str) -> tuple[dict, dict]:
 def _find_card_images(slot: str) -> dict[str, Path]:
     """main.py가 만들어둔 실제 카드뉴스 PNG(커버/오늘의 사실/왜중요/앞으로는)를 찾아서
     변수명 -> 경로로 반환. 같은 AI 일러스트를 반복하는 대신 실제 카드를 블로그에 그대로 재사용한다."""
-    today = datetime.now().strftime("%Y%m%d")
+    today = now_kst().strftime("%Y%m%d")
     run_dir = config.OUTPUT_DIR / today
     found = {}
     for name in ("cover", "fact", "viewpoint", "why", "outlook"):
@@ -186,7 +187,7 @@ def main():
 
     draft = build_draft(slot, data, article)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    stamp = now_kst().strftime("%Y%m%d_%H%M%S")
     out_path = OUT_DIR / f"blog_draft_{stamp}_{slot}.json"
     out_path.write_text(json.dumps(draft, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"[BLOG_DRAFT] {out_path}")

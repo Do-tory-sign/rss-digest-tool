@@ -53,16 +53,20 @@ def main():
     _run([GH, "run", "download", str(run_id), "-R", REPO,
           "-n", f"approved-cards-{slot}", "-D", str(dest)])
 
-    # 아티팩트 구조: dest/<date>/<slot>_*.png -> 로컬 output/<date>/ 로 복사
-    output_root = ROOT / "output"
+    # 아티팩트 구조: dest/<date>/<slot>_*.png, v2_*_<slot>.json -> config.OUTPUT_DIR/<date>/ 로 복사
+    # (blog/dotory_blog_draft.py가 config.OUTPUT_DIR 기준으로 카드 이미지 + JSON을 찾음 —
+    # 예전엔 여기 ROOT/"output"으로 복사해서 실제 경로와 안 맞아 JSON을 못 찾는 버그가 있었음)
+    import config
     for date_dir in dest.iterdir():
         if not date_dir.is_dir():
             continue
-        target = output_root / date_dir.name
+        target = config.OUTPUT_DIR / date_dir.name
         target.mkdir(parents=True, exist_ok=True)
-        for f in date_dir.glob(f"{slot}_*.png"):
-            (target / f.name).write_bytes(f.read_bytes())
-            print(f"[run_blog_local]   복사: {f.name}")
+        patterns = [f"{slot}_*.png", f"v2_articles_{slot}.json", f"v2_curated_{slot}.json"]
+        for pattern in patterns:
+            for f in date_dir.glob(pattern):
+                (target / f.name).write_bytes(f.read_bytes())
+                print(f"[run_blog_local]   복사: {f.name}")
 
     print(f"[run_blog_local] [{slot}] 블로그 초안 작성 중...")
     blog_dir = ROOT / "blog"

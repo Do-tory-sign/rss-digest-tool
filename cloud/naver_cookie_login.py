@@ -1,107 +1,63 @@
-"""(2단계 스캐폴딩) GitHub Actions 안에서 Playwright headless Chromium에 네이버 로그인
-쿠키를 주입해 로그인 상태를 복원한다.
+"""GitHub Actions 러너에서 네이버 로그인 세션을 쿠키만으로 복원한다.
 
-기존 blog/naver_engine의 "좌표 클릭 + 로컬 크롬 프로필 재사용" 방식은 headless
-클라우드 환경에 그대로 이식할 수 없다(원인은 docs/github_actions_migration.md
-"2단계 설계" 섹션 참고). 이 파일은 그 대체 경로의 뼈대만 만들어둔 것이며,
-실제 스마트에디터 조작(제목/본문 입력, 이미지 첨부, 저장/발행 버튼) 로직은
-아직 구현되지 않았다 — TODO 표시된 부분을 다음 세션에서 완성해야 한다.
+2026-07-06: 이전 버전은 Playwright로 스마트에디터 자체를 새로 자동화하려던 스캐폴딩이었는데,
+그러면 blog/naver_engine.py에 이미 있는(수십 번 테스트해서 다듬은) 제목/본문/이미지/굵게
+서식 로직을 통째로 재구현해야 해서 리스크가 컸다. 대신 이 스크립트는 "로그인된 브라우저를
+준비하는 것"까지만 새로 하고, 그 뒤(naver_engine.py의 실제 글쓰기 자동화)는 전혀 안 건드린다.
 
-사용법(완성 후):
-    python cloud/naver_cookie_login.py --draft <blog_draft_json_path> [--publish]
+방법: 헤드리스 크롬을 config.DEBUG_PORT로 원격 디버깅 포트를 열어서 띄우고, Selenium으로
+그 포트에 붙어(naver_engine.py가 로컬에서 하는 것과 완전히 같은 방식) NID_AUT/NID_SES
+쿠키를 주입한다. 이후 dotory_blog_draft.py/dotory_blog_publish.py를 그대로 실행하면
+naver_engine.py가 같은 디버그 포트에 붙어서 평소처럼 동작한다.
 
-필요 조건:
-    pip install playwright
-    playwright install chromium
-    환경변수 NAVER_COOKIES_JSON (GitHub Secret에서 주입됨, extract_naver_cookies.py로 생성한 형식)
+사용법(GitHub Actions에서만 의미 있음, 로컬 자동화 크롬과 포트 겹치지 않게 주의):
+    python -X utf8 cloud/naver_cookie_login.py
 """
 from __future__ import annotations
 
-import argparse
 import json
 import os
+import subprocess
 import sys
+import tempfile
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "blog"))
+
+from naver_engine.config import DEBUG_PORT, DEBUGGER_ADDRESS
+
+NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
 
-def _load_cookies() -> list[dict]:
-    raw = os.getenv("NAVER_COOKIES_JSON", "")
-    if not raw:
-        print("[naver_cookie_login] NAVER_COOKIES_JSON 환경변수 없음")
-        sys.exit(1)
-    try:
-        data = json.loads(raw)
-    except Exception as e:
-        print(f"[naver_cookie_login] NAVER_COOKIES_JSON 파싱 실패: {e}")
-        sys.exit(1)
-    # extract_naver_cookies.py가 만드는 형식: {"NID_AUT": "...", "NID_SES": "...", ...}
-    # Playwright의 add_cookies()가 요구하는 형식으로 변환
-    cookies = []
-    for name, value in data.items():
-        cookies.append({
-            "name": name,
-            "value": value,
-            "domain": ".naver.com",
-            "path": "/",
-            "httpOnly": True,
-            "secure": True,
-        })
-    return cookies
+def _find_chrome() -> Path | None:
+    candidates = [
+        Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
+        Path(r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"),
+    ]
+    return next((p for p in candidates if p.exists()), None)
 
 
-def run(draft_path: Path, do_publish: bool) -> bool:
-    try:
-        from playwright.sync_api import sync_playwright
-    except ImportError:
-        print("[naver_cookie_login] playwright 미설치 — requirements에 추가 필요: pip install playwright")
-        return False
-
-    draft = json.loads(draft_path.read_text(encoding="utf-8"))
-    title = draft.get("title", "")
-    body = draft.get("body", "")
-    images = [Path(p) for p in draft.get("images", []) if p and Path(p).exists()]
-
-    cookies = _load_cookies()
-
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context()
-        context.add_cookies(cookies)
-        page = context.new_page()
-
-        # 로그인 상태 확인 — 네이버 메인에서 로그인 사용자 메뉴가 보이는지로 판단
-        page.goto("https://www.naver.com/", wait_until="networkidle")
-        is_logged_in = page.locator("a.MyView-module__link_login___HpHMW").count() == 0
-        if not is_logged_in:
-            print("[naver_cookie_login] 로그인 실패 감지 — 쿠키 만료 가능성")
-            _notify_cookie_expired()
-            browser.close()
-            return False
-
-        # TODO(다음 세션): 네이버 블로그 글쓰기 페이지로 이동 후 스마트에디터 ONE의
-        # 실제 DOM 구조(iframe 내부의 제목/본문 편집영역, 이미지 첨부 input[type=file],
-        # 저장/발행 버튼)를 조사해 selector 기반으로 다음을 구현해야 한다:
-        #   1) https://blog.naver.com/{blog_id}?Redirect=Write 이동
-        #   2) 제목 입력란에 title 입력
-        #   3) 본문 편집 iframe 진입 → body 텍스트 입력(줄바꿈/서식 처리 주의)
-        #   4) 이미지 첨부 컨트롤에 images 경로들을 set_input_files로 업로드
-        #   5) 저장(임시저장) 버튼 클릭, do_publish=True면 발행 버튼까지 클릭
-        # 기존 blog/naver_engine/naver_engine.py의 좌표값은 재사용 불가하지만, 어떤
-        # 단계들이 필요한지 순서 참고용으로는 그 파일을 읽어봐도 좋다(수정하지 말 것).
-        print("[naver_cookie_login] 로그인 확인 완료 — 여기서부터 스마트에디터 자동화 미구현")
-        browser.close()
-
-    return False  # 완성 전까지는 항상 실패로 보고(오탐 방지)
+def _wait_for_debug_port(timeout: float = 20.0) -> bool:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            urllib.request.urlopen(f"http://{DEBUGGER_ADDRESS}/json/version", timeout=1.5)
+            return True
+        except (urllib.error.URLError, OSError):
+            time.sleep(0.5)
+    return False
 
 
 def _notify_cookie_expired():
-    """쿠키 만료 시 텔레그램 알림 — cloud/telegram_gate.py 재사용."""
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     try:
         from telegram_gate import _send_message
-        _send_message("⚠️ 네이버 블로그 쿠키 만료 — 로컬에서 재추출 필요:\n"
+        _send_message("⚠️ 네이버 블로그 쿠키 만료(또는 클라우드 IP 이상탐지) — 로컬에서 재추출 필요:\n"
                        "python cloud/extract_naver_cookies.py 실행 후 "
                        "GitHub Secret NAVER_COOKIES_JSON 갱신")
     except Exception as e:
@@ -109,12 +65,53 @@ def _notify_cookie_expired():
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--draft", required=True)
-    parser.add_argument("--publish", action="store_true")
-    args = parser.parse_args()
-    ok = run(Path(args.draft), args.publish)
-    sys.exit(0 if ok else 1)
+    cookies_json = os.environ.get("NAVER_COOKIES_JSON", "")
+    if not cookies_json:
+        print("[naver_cookie_login] NAVER_COOKIES_JSON 환경변수가 없음")
+        sys.exit(1)
+    cookies = json.loads(cookies_json)
+
+    chrome = _find_chrome()
+    if not chrome:
+        print("[naver_cookie_login] Chrome을 찾지 못함")
+        sys.exit(1)
+
+    profile_dir = Path(tempfile.mkdtemp(prefix="naver_headless_"))
+    cmd = [
+        str(chrome),
+        f"--remote-debugging-port={DEBUG_PORT}",
+        f"--user-data-dir={profile_dir}",
+        "--headless=new",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-gpu",
+    ]
+    subprocess.Popen(
+        cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        creationflags=(subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP | NO_WINDOW),
+    )
+
+    if not _wait_for_debug_port():
+        print("[naver_cookie_login] 헤드리스 크롬 디버그 포트가 안 뜸")
+        sys.exit(1)
+
+    from selenium import webdriver
+    from selenium.webdriver.chrome.options import Options
+
+    options = Options()
+    options.add_experimental_option("debuggerAddress", DEBUGGER_ADDRESS)
+    driver = webdriver.Chrome(options=options)
+    driver.get("https://www.naver.com/")
+    for name, value in cookies.items():
+        driver.add_cookie({"name": name, "value": value, "domain": ".naver.com", "path": "/"})
+    driver.get("https://www.naver.com/")  # 쿠키 반영해서 새로고침
+
+    page = driver.page_source
+    logged_in = "로그아웃" in page or "logout" in page.lower()
+    print(f"[naver_cookie_login] 로그인 상태: {'성공' if logged_in else '확인 불가(실패 가능성 — IP 이상탐지일 수 있음)'}")
+    if not logged_in:
+        _notify_cookie_expired()
+        sys.exit(1)
 
 
 if __name__ == "__main__":
