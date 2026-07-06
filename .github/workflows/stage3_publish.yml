@@ -87,9 +87,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: approved-cards-${{ steps.slot.outputs.slot }}
-          path: |
-            D:/Dotory/Cardnews/output
-            web/v2/img
+          # 2026-07-06: 블로그는 조립된 카드(cover/fact/... 최종 PNG, D:/output에 있음)만 있으면
+          # 되고 원본 일러스트(web/v2/img)는 필요 없음 — 게다가 서로 다른 드라이브(D:\ vs
+          # 체크아웃 폴더)를 같이 넣으면 upload-artifact가 공통 상위 경로를 못 찾아 에러남.
+          path: D:/Dotory/Cardnews/output
           retention-days: 2
 
       - name: 민감 파일 정리
