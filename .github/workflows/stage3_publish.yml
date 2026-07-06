@@ -58,6 +58,25 @@ jobs:
           }
           echo "slot=$slot" >> $env:GITHUB_OUTPUT
 
+      - name: 슬롯 정시(:55 KST)까지 대기 (미리 승인해둬도 정시에 발행되게)
+        shell: pwsh
+        run: |
+          # 2026-07-06: 카드 승인 즉시 발행하면, 사용자가 외출 전에 미리 승인해둔 경우
+          # 실제 슬롯 시각(예: 밤 10시)이 아니라 승인한 시점에 바로 게시돼버림 — 로컬
+          # review.py가 하던 것처럼 슬롯:55까지 대기했다가 발행하도록 클라우드에도 동일하게 적용.
+          $kst = [System.TimeZoneInfo]::FindSystemTimeZoneById("Korea Standard Time")
+          $hourMap = @{ morning = 6; lunch = 11; evening = 16; night = 21 }
+          $slot = "${{ steps.slot.outputs.slot }}"
+          $nowKst = [System.TimeZoneInfo]::ConvertTimeFromUtc((Get-Date).ToUniversalTime(), $kst)
+          $target = Get-Date -Year $nowKst.Year -Month $nowKst.Month -Day $nowKst.Day -Hour $hourMap[$slot] -Minute 55 -Second 0
+          $waitSec = ($target - $nowKst).TotalSeconds
+          if ($waitSec -gt 0) {
+            Write-Host "[wait] $slot 목표 시각(KST $($target.ToString('HH:mm')))까지 ${waitSec}초 대기"
+            Start-Sleep -Seconds $waitSec
+          } else {
+            Write-Host "[wait] 이미 목표 시각 지남 — 즉시 발행"
+          }
+
       - name: Stage 2가 만든 승인된 카드 이미지 복원
         uses: actions/cache/restore@v4
         with:
