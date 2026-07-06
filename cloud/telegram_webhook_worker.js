@@ -58,6 +58,7 @@ export default {
       card_approve: "cards_approved",
       card_regen: "card_regen",
       card_reject: "cards_rejected",
+      image_regen: "image_regen",
     };
     const eventType = EVENT_MAP[action];
 

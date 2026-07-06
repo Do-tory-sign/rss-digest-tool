@@ -182,6 +182,10 @@ def cmd_send_cards(args):
             [{"text": "✅ 전체승인 → 배포", "callback_data": f"card_approve|{slot}"},
              {"text": "❌ 전체 반려 (오늘 이 슬롯 취소)", "callback_data": f"card_reject|{slot}"}],
             *regen_rows,
+            # 2026-07-06: 카드별 재생성은 캐릭터 포즈만 바뀌고 배경 일러스트(모든 카드가 공유)는
+            # 그대로라 "그림 자체가 마음에 안 든다"는 피드백을 반영할 방법이 없었음 — 일러스트
+            # 자체를 다시 그리고 그걸 쓰는 카드를 전부 재조립하는 버튼을 추가.
+            [{"text": "🎨 그림만 다시 그리기 (기사 내용 유지)", "callback_data": f"image_regen|{slot}"}],
         ]
     }
     msg_id = _send_message(

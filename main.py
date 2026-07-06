@@ -272,6 +272,44 @@ def regenerate_single_card(slot: str, card_name: str) -> Path | None:
         return None
 
 
+def regenerate_article_image(slot: str) -> list[Path] | None:
+    """기사 내용(제목/본문 등)은 그대로 두고 메인 일러스트(article["image"])만 다시 그린 뒤,
+    그 일러스트를 쓰는 카드(cover/fact/why/outlook 등)를 전부 다시 렌더링한다.
+    2026-07-06: 카드별 "재생성" 버튼은 캐릭터 포즈만 바뀌고 배경 일러스트는 그대로였음
+    (모든 카드가 같은 article["image"]를 공유해서 그림) — "그림만 다시 만들고 싶다"는
+    요청은 이 일러스트 자체를 다시 생성해야 해결됨."""
+    from news.article_image import generate_article_image
+
+    today = config.now_kst().strftime("%Y%m%d")
+    run_dir = config.OUTPUT_DIR / today
+    data, article = _load_v2_data(run_dir, slot)
+    if not data or not article or not article.get("image"):
+        return None
+
+    img_path = V2_DIR / article["image"]
+    category = article.get("category", "hot")
+    title = article.get("title") or data.get("card_headline", "")
+    lead = article.get("lead") or article.get("card_summary", "")
+
+    for attempt in range(3):
+        style, _scene = generate_article_image(category, title, lead, img_path)
+        if style and style != "F":
+            break
+    else:
+        print("[main] 메인 일러스트 재생성 실패 (3회 시도 모두 실패)")
+        return None
+
+    rebuilt = []
+    card_names = ["cover", "fact", "why", "outlook"]
+    if article.get("has_viewpoint_diff"):
+        card_names.insert(2, "viewpoint")
+    for name in card_names:
+        out_path = regenerate_single_card(slot, name)
+        if out_path:
+            rebuilt.append(out_path)
+    return rebuilt or None
+
+
 def run(slot: str, dry_run: bool = False, publish_only: bool = False) -> bool:
     """오늘 v2 데이터(해당 슬롯)로 카드 조립 → 검증 → (dry_run 아니면) 사이트 배포 + 인스타 업로드.
     성공하면 True, 실패하면 False.
