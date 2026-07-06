@@ -58,12 +58,28 @@ jobs:
           }
           echo "slot=$slot" >> $env:GITHUB_OUTPUT
 
+      - name: Stage 2가 만든 승인된 카드 이미지 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            D:/Dotory/Cardnews/output
+            web/v2/img
+          key: dotory-output-nokey
+          restore-keys: |
+            dotory-output-
+
       - name: 슬롯 정시(:55 KST)까지 대기 (미리 승인해둬도 정시에 발행되게)
         shell: pwsh
         run: |
           # 2026-07-06: 카드 승인 즉시 발행하면, 사용자가 외출 전에 미리 승인해둔 경우
           # 실제 슬롯 시각(예: 밤 10시)이 아니라 승인한 시점에 바로 게시돼버림 — 로컬
           # review.py가 하던 것처럼 슬롯:55까지 대기했다가 발행하도록 클라우드에도 동일하게 적용.
+          # 반드시 캐시 복원 "다음"에 대기해야 함 — 대기가 먼저면, 대기하는 몇 시간 동안
+          # 다른 실행들이 캐시를 계속 새로 저장해서 restore-keys 접두어 매칭이 엉뚱한(더 최신)
+          # 캐시를 가리키게 되고, 깨어난 뒤 복원하면 지금 승인한 데이터가 아닌 다른 데이터가
+          # 온다(실제로 이 버그로 밤 슬롯 발행이 통째로 실패한 적 있음, 07-06). 캐시를 먼저
+          # 복원해서 D: 드라이브에 파일을 내려받아두면, 대기 중 다른 실행이 캐시를 덮어써도
+          # 이미 이 러너 로컬에 파일이 있으니 영향 없음.
           $kst = [System.TimeZoneInfo]::FindSystemTimeZoneById("Korea Standard Time")
           $hourMap = @{ morning = 6; lunch = 11; evening = 16; night = 21 }
           $slot = "${{ steps.slot.outputs.slot }}"
@@ -76,16 +92,6 @@ jobs:
           } else {
             Write-Host "[wait] 이미 목표 시각 지남 — 즉시 발행"
           }
-
-      - name: Stage 2가 만든 승인된 카드 이미지 복원
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            D:/Dotory/Cardnews/output
-            web/v2/img
-          key: dotory-output-nokey
-          restore-keys: |
-            dotory-output-
 
       - name: instagram_graph_token.json 복원 (Secret -> 파일)
         shell: pwsh
