@@ -8,21 +8,23 @@ on:
         required: true
         type: choice
         options: [morning, lunch, evening, night]
+      run_id:
+        description: "정확한 캐시를 남긴 stage1/2 run id (모호한 prefix 매칭 방지용)"
+        required: true
+        type: string
 
 jobs:
   fetch:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: 오늘자 산출물 복원
+      - name: 지정한 run의 산출물 정확히 복원 (prefix 매칭 안 함)
         uses: actions/cache/restore@v4
         with:
           path: |
             D:/Dotory/Cardnews/output
             web/v2/img
-          key: dotory-output-nokey
-          restore-keys: |
-            dotory-output-
+          key: dotory-output-${{ inputs.run_id }}
       - name: JSON만 아티팩트로 업로드
         uses: actions/upload-artifact@v4
         with:
