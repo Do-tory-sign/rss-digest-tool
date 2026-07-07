@@ -1,0 +1,70 @@
+name: "기사 문구 수정 + 카드 재생성 (수동 실행 전용)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: "슬롯"
+        required: true
+        type: choice
+        options: [morning, lunch, evening, night]
+      field:
+        description: "고칠 필드명 (예: why_it_matters)"
+        required: true
+        type: string
+      value:
+        description: "새 문구"
+        required: true
+        type: string
+      card:
+        description: "재생성할 카드"
+        required: true
+        type: choice
+        options: [cover, fact, viewpoint, why, outlook]
+
+env:
+  PYTHONIOENCODING: "utf-8"
+
+jobs:
+  patch-and-regen:
+    runs-on: windows-latest
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      BRAND_NAME: ${{ secrets.BRAND_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: playwright install --with-deps chromium
+
+      - name: D 드라이브 출력 폴더 준비
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path "D:/Dotory/Cardnews/output" | Out-Null
+
+      - name: Stage 2 산출물 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            D:/Dotory/Cardnews/output
+            web/v2/img
+          key: dotory-output-nokey
+          restore-keys: |
+            dotory-output-
+
+      - name: 문구 수정 + 카드 재생성 + 재전송
+        shell: pwsh
+        run: |
+          python cloud/patch_article_field_and_regen.py --slot ${{ inputs.slot }} --field ${{ inputs.field }} --value "${{ inputs.value }}" --card ${{ inputs.card }}
+
+      - name: 갱신된 산출물 재저장
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            D:/Dotory/Cardnews/output
+            web/v2/img
+          key: dotory-output-${{ github.run_id }}
