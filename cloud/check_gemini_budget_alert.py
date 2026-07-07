@@ -36,14 +36,21 @@ def main():
         print("[check_gemini_budget_alert] GEMINI_BUDGET_RELAY_SA_JSON 환경변수 없음")
         sys.exit(1)
 
+    from google.api_core.exceptions import DeadlineExceeded
+
     creds = service_account.Credentials.from_service_account_info(json.loads(sa_json))
     subscriber = pubsub_v1.SubscriberClient(credentials=creds)
     subscription_path = subscriber.subscription_path(PROJECT_ID, SUBSCRIPTION_ID)
 
-    response = subscriber.pull(
-        request={"subscription": subscription_path, "max_messages": 20},
-        timeout=15,
-    )
+    try:
+        response = subscriber.pull(
+            request={"subscription": subscription_path, "max_messages": 20},
+            timeout=30,
+        )
+    except DeadlineExceeded:
+        # 큐가 비어있을 때 pull이 그냥 타임아웃으로 끝나는 경우가 있음 — "알림 없음"과 동일하게 처리
+        print("[check_gemini_budget_alert] pull 타임아웃 (알림 없음으로 간주)")
+        return
 
     if not response.received_messages:
         print("[check_gemini_budget_alert] 새 알림 없음")
