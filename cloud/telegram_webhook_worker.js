@@ -55,6 +55,7 @@ export default {
       art_approve: "article_approved",
       art_regen: "article_regen",
       art_reject: "article_rejected",
+      art_image_regen: "article_image_regen",
       card_approve: "cards_approved",
       card_regen: "card_regen",
       card_reject: "cards_rejected",

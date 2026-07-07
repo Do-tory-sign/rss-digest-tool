@@ -39,6 +39,7 @@ CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 TODAY = now_kst().strftime("%Y%m%d")
 
 CAT_LABEL = {"hot": "🔥 핫뉴스", "economy": "💰 경제·IT", "culture": "🎵 트렌드"}
+SLOT_LABEL = {"morning": "☀️ 아침한입", "lunch": "🌤 점심한입", "evening": "🌙 저녁한입", "night": "🌃 야식한입"}
 CARD_NAMES = ["cover", "fact", "viewpoint", "why", "outlook"]
 CARD_LABELS = {
     "cover": "커버", "fact": "오늘의 사실", "viewpoint": "서로 다른 시각",
@@ -118,12 +119,17 @@ def cmd_send_article(args):
     if article.get("fallback_used"):
         warning += "\n\n⚠️ AI 합성이 실패해서 간단 규칙기반 문구로 대체됐어요"
 
-    caption = f"{label}\n\n<b>{title}</b>\n\n{lead}{warning}"
+    slot_label = SLOT_LABEL.get(slot, slot)
+    caption = f"{slot_label} | {label}\n\n<b>{title}</b>\n\n{lead}{warning}"
 
     markup = {
         "inline_keyboard": [
             [{"text": "✅ 승인 → 카드 생성", "callback_data": f"art_approve|{slot}"},
-             {"text": "🔄 재생성", "callback_data": f"art_regen|{slot}|{cat}"}],
+             {"text": "🔄 기사 다시 뽑기", "callback_data": f"art_regen|{slot}|{cat}"}],
+            # 2026-07-07: "재생성"이 기사 자체를 통째로 새로 뽑아서(다른 주제로 바뀔 수 있음)
+            # "기사 내용은 좋은데 그림만 별로다" 케이스에 대응이 안 됐음 — 기사(제목/본문)는
+            # 그대로 두고 일러스트만 다시 그리는 버튼 추가.
+            [{"text": "🎨 그림만 다시 그리기 (기사 내용 유지)", "callback_data": f"art_image_regen|{slot}"}],
             [{"text": "❌ 반려 (오늘 이 게시물 취소)", "callback_data": f"art_reject|{slot}"}],
         ]
     }

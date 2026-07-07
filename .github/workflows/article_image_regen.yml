@@ -1,0 +1,59 @@
+name: "기사 그림만 재생성 (기사 내용 유지)"
+
+on:
+  repository_dispatch:
+    types: [article_image_regen]
+
+env:
+  PYTHONIOENCODING: "utf-8"
+
+jobs:
+  regen-article-image:
+    runs-on: windows-latest
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      BRAND_NAME: ${{ secrets.BRAND_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: playwright install --with-deps chromium
+
+      - name: D 드라이브 출력 폴더 준비
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path "D:/Dotory/Cardnews/output" | Out-Null
+
+      - name: Stage 1 산출물 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            D:/Dotory/Cardnews/output
+            web/v2/img
+          key: dotory-output-nokey
+          restore-keys: |
+            dotory-output-
+
+      - name: 슬롯 추출
+        id: p
+        shell: pwsh
+        run: |
+          $slot = python cloud/dispatch_payload.py slot
+          echo "slot=$slot" >> $env:GITHUB_OUTPUT
+
+      - name: 그림 재생성 + 기사 승인 메시지 재전송
+        shell: pwsh
+        run: |
+          python cloud/regen_article_image_and_notify.py --slot ${{ steps.p.outputs.slot }}
+
+      - name: 갱신된 산출물 재저장
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            D:/Dotory/Cardnews/output
+            web/v2/img
+          key: dotory-output-${{ github.run_id }}
