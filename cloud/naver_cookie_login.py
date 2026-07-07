@@ -81,10 +81,18 @@ def main():
         str(chrome),
         f"--remote-debugging-port={DEBUG_PORT}",
         f"--user-data-dir={profile_dir}",
-        "--headless=new",
+        # 2026-07-07: naver_engine.py의 실제 글쓰기 자동화는 pyautogui/win32gui로 진짜 화면
+        # 좌표와 윈도우 포커스를 조작하는 방식이라 --headless=new(화면 자체가 없음)로는
+        # 절대 동작 못 함(제목 입력이 항상 빈 문자열로 읽힘) — GitHub 호스팅 Windows 러너는
+        # 로컬처럼 실제 대화형 데스크톱 세션이 있으므로, 헤드리스를 빼고 로컬과 동일하게
+        # 진짜 창을 띄운다.
+        "--start-maximized",
         "--no-first-run",
         "--no-default-browser-check",
-        "--disable-gpu",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-renderer-backgrounding",
+        "--disable-background-timer-throttling",
+        "--disable-features=CalculateNativeWinOcclusion",
     ]
     subprocess.Popen(
         cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
