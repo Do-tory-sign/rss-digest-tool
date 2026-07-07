@@ -82,6 +82,26 @@ jobs:
         shell: pwsh
         run: New-Item -ItemType Directory -Force -Path "D:/Dotory/Cardnews/output" | Out-Null
 
+      - name: 오늘자 KST 날짜 계산 (중복 실행 방지 키용)
+        id: kst
+        shell: pwsh
+        run: |
+          $kst = [System.TimeZoneInfo]::FindSystemTimeZoneById("Korea Standard Time")
+          $nowKst = [System.TimeZoneInfo]::ConvertTimeFromUtc((Get-Date).ToUniversalTime(), $kst)
+          echo "date=$($nowKst.ToString('yyyyMMdd'))" >> $env:GITHUB_OUTPUT
+
+      - name: 오늘 이 슬롯 이미 수집됐는지 확인 (cron 중복 실행 방지)
+        id: dedup
+        uses: actions/cache/restore@v4
+        with:
+          path: cloud/.dedup_marker
+          key: dotory-collected-${{ steps.kst.outputs.date }}-${{ env.SLOT }}
+
+      # 2026-07-07: 사용자가 수동으로 슬롯을 미리 트리거해서 이미 승인까지 끝냈는데, 그 슬롯의
+      # 실제 cron이 몇 시간 늦게 도착해서 같은 슬롯 기사가 하루에 두 번 만들어지는 문제가 있었음
+      # — schedule(자동) 트리거일 때만, 오늘 이 슬롯이 이미 한 번 수집된 적 있으면 건너뛴다.
+      # workflow_dispatch(수동)나 article_regen(재생성 버튼)은 사용자가 의도한 재실행이므로
+      # 그대로 진행시킨다.
       - name: 재생성 피드백 추출 (article_regen 이벤트일 때만)
         id: feedback
         if: github.event_name == 'repository_dispatch'
@@ -91,14 +111,28 @@ jobs:
           echo "category=$extra" >> $env:GITHUB_OUTPUT
 
       - name: 뉴스 수집 + 큐레이션 + 이미지 생성 (v2_main.py 그대로 재사용)
+        if: github.event_name != 'schedule' || steps.dedup.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           python -X utf8 v2_main.py --slot $env:SLOT --fresh
 
       - name: 텔레그램 기사 승인 요청 전송
+        if: github.event_name != 'schedule' || steps.dedup.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           python cloud/telegram_gate.py send-article --slot $env:SLOT
+
+      - name: 중복 실행 방지 표시 저장
+        if: github.event_name != 'schedule' || steps.dedup.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path cloud/.dedup_marker | Out-Null
+
+      - name: 중복 실행 방지 캐시 저장
+        if: steps.dedup.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: cloud/.dedup_marker
+          key: dotory-collected-${{ steps.kst.outputs.date }}-${{ env.SLOT }}
 
       - name: 산출물 캐시 저장 (Stage 2에서 이어받기 위함)
         if: always()
