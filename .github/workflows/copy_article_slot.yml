@@ -1,0 +1,59 @@
+name: "기사 슬롯 복사 (다른 시간대로 재사용, 수동 실행 전용)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      from_slot:
+        description: "원본 슬롯"
+        required: true
+        type: choice
+        options: [morning, lunch, evening, night]
+      to_slot:
+        description: "복사할 슬롯"
+        required: true
+        type: choice
+        options: [morning, lunch, evening, night]
+
+env:
+  PYTHONIOENCODING: "utf-8"
+
+jobs:
+  copy-slot:
+    runs-on: windows-latest
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      BRAND_NAME: ${{ secrets.BRAND_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+
+      - name: D 드라이브 출력 폴더 준비
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path "D:/Dotory/Cardnews/output" | Out-Null
+
+      - name: 산출물 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            D:/Dotory/Cardnews/output
+            web/v2/img
+          key: dotory-output-nokey
+          restore-keys: |
+            dotory-output-
+
+      - name: 슬롯 복사 + 승인 메시지 재전송
+        shell: pwsh
+        run: |
+          python cloud/copy_article_slot.py --from ${{ inputs.from_slot }} --to ${{ inputs.to_slot }}
+
+      - name: 갱신된 산출물 재저장
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            D:/Dotory/Cardnews/output
+            web/v2/img
+          key: dotory-output-${{ github.run_id }}
