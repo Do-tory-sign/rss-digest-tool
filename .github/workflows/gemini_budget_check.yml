@@ -1,0 +1,22 @@
+name: "제미니 API 예산 알림 확인 (Pub/Sub -> 텔레그램)"
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"  # 30분마다 확인
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      BRAND_NAME: ${{ secrets.BRAND_NAME }}
+      GEMINI_BUDGET_RELAY_SA_JSON: ${{ secrets.GEMINI_BUDGET_RELAY_SA_JSON }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install google-cloud-pubsub requests python-dotenv tzdata
+      - run: python cloud/check_gemini_budget_alert.py
