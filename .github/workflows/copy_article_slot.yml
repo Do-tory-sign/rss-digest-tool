@@ -50,6 +50,27 @@ jobs:
         run: |
           python cloud/copy_article_slot.py --from ${{ inputs.from_slot }} --to ${{ inputs.to_slot }}
 
+      # 2026-07-07: 이 워크플로우는 stage1_collect.yml의 정식 수집 과정을 안 거치기 때문에
+      # "오늘 이 슬롯 이미 수집했음" 중복 방지 표시가 안 남아서, 나중에 그 슬롯의 진짜 cron이
+      # 늦게 도착하면 또 새 기사를 만들어버리는 문제가 있었음 — 여기서도 같은 표시를 남긴다.
+      - name: 오늘자 KST 날짜 계산
+        id: kst
+        shell: pwsh
+        run: |
+          $kst = [System.TimeZoneInfo]::FindSystemTimeZoneById("Korea Standard Time")
+          $nowKst = [System.TimeZoneInfo]::ConvertTimeFromUtc((Get-Date).ToUniversalTime(), $kst)
+          echo "date=$($nowKst.ToString('yyyyMMdd'))" >> $env:GITHUB_OUTPUT
+
+      - name: 중복 실행 방지 표시 저장
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path cloud/.dedup_marker | Out-Null
+
+      - name: 중복 실행 방지 캐시 저장
+        uses: actions/cache/save@v4
+        with:
+          path: cloud/.dedup_marker
+          key: dotory-collected-${{ steps.kst.outputs.date }}-${{ inputs.to_slot }}
+
       - name: 갱신된 산출물 재저장
         uses: actions/cache/save@v4
         with:
