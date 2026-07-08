@@ -56,7 +56,13 @@ def main():
         print("[check_gemini_budget_alert] 새 알림 없음")
         return
 
+    # 2026-07-08: GCP 예산 알림은 임계값을 한 번 넘으면 그 뒤로도 비용이 재계산될 때마다
+    # 계속 같은 내용을 반복 발행함(GCP 쪽 사양 — 우리 pull/ack 로직 버그 아님) — 그래서
+    # 하루 새벽 내내 거의 동일한 텔레그램 메시지가 몇십 통씩 오는 문제가 있었음.
+    # 큐는 매번 비워야(ack) 하지만, 텔레그램 전송은 이 run들 중 "가장 심각한(%가 가장 높은)"
+    # 메시지 하나만, 그것도 오늘 하루에 아직 안 보냈을 때만 하도록 제한한다.
     ack_ids = []
+    best = None  # (pct, text)
     for msg in response.received_messages:
         ack_ids.append(msg.ack_id)
         try:
@@ -84,10 +90,24 @@ def main():
         )
         if remaining <= 2000:
             text = "⚠️ 제미니 API 크레딧이 얼마 안 남았어요!\n\n" + text
-        _send_message(text)
+        if best is None or pct > best[0]:
+            best = (pct, text)
 
     subscriber.acknowledge(request={"subscription": subscription_path, "ack_ids": ack_ids})
-    print(f"[check_gemini_budget_alert] {len(ack_ids)}건 처리 완료")
+    print(f"[check_gemini_budget_alert] {len(ack_ids)}건 처리(ack) 완료")
+
+    if best is None:
+        return
+
+    marker = Path("cloud/.gemini_budget_alert_sent_today")
+    if marker.exists():
+        print("[check_gemini_budget_alert] 오늘 이미 보냈음 — 텔레그램 전송 생략")
+        return
+
+    _send_message(best[1])
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text("sent", encoding="utf-8")
+    print("[check_gemini_budget_alert] 텔레그램 전송 완료")
 
 
 if __name__ == "__main__":

@@ -19,4 +19,25 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install google-cloud-pubsub requests python-dotenv tzdata
+
+      - name: 오늘자 KST 날짜 계산
+        id: kst
+        run: echo "date=$(TZ=Asia/Seoul date +%Y%m%d)" >> "$GITHUB_OUTPUT"
+
+      # 2026-07-08: GCP 예산 알림이 하루에 몇십 번씩 반복 발행돼서 매번 텔레그램으로
+      # 보내면 새벽 내내 알림 폭탄이 됨 — 오늘 하루 한 번 보냈는지 표시를 캐시에 남겨서
+      # check_gemini_budget_alert.py가 그 이후엔 조용히 ack만 하고 넘어가게 한다.
+      - name: 오늘 이미 보냈는지 확인
+        uses: actions/cache/restore@v4
+        with:
+          path: cloud/.gemini_budget_alert_sent_today
+          key: gemini-budget-alert-sent-${{ steps.kst.outputs.date }}
+
       - run: python cloud/check_gemini_budget_alert.py
+
+      - name: 오늘 전송 여부 캐시 저장
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: cloud/.gemini_budget_alert_sent_today
+          key: gemini-budget-alert-sent-${{ steps.kst.outputs.date }}
