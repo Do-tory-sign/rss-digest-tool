@@ -21,7 +21,7 @@ from news.article_image import generate_article_image  # noqa: E402
 from cloud.telegram_gate import cmd_send_article, _send_message  # noqa: E402
 
 
-def run(slot: str) -> bool:
+def run(slot: str, feedback: str = "") -> bool:
     today = config.now_kst().strftime("%Y%m%d")
     articles_path = config.OUTPUT_DIR / today / f"v2_articles_{slot}.json"
     if not articles_path.exists():
@@ -42,7 +42,8 @@ def run(slot: str) -> bool:
     img_path = ROOT / "web" / "v2" / "img" / f"{today}_{category}.png"
 
     for attempt in range(3):
-        style, _scene, _mismatch, _tone = generate_article_image(category, title, lead, img_path)
+        style, _scene, _mismatch, _tone = generate_article_image(
+            category, title, lead, img_path, feedback=feedback)
         if style and style != "F":
             break
     else:
@@ -56,8 +57,9 @@ def run(slot: str) -> bool:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--slot", required=True)
+    parser.add_argument("--feedback", default="")
     args = parser.parse_args()
-    ok = run(args.slot)
+    ok = run(args.slot, feedback=args.feedback)
     sys.exit(0 if ok else 1)
 
 
