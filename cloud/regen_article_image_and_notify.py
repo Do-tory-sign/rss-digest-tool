@@ -42,7 +42,7 @@ def run(slot: str) -> bool:
     img_path = ROOT / "web" / "v2" / "img" / f"{today}_{category}.png"
 
     for attempt in range(3):
-        style, _scene = generate_article_image(category, title, lead, img_path)
+        style, _scene, _mismatch, _tone = generate_article_image(category, title, lead, img_path)
         if style and style != "F":
             break
     else:

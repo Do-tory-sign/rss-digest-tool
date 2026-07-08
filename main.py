@@ -292,7 +292,7 @@ def regenerate_article_image(slot: str) -> list[Path] | None:
     lead = article.get("lead") or article.get("card_summary", "")
 
     for attempt in range(3):
-        style, _scene = generate_article_image(category, title, lead, img_path)
+        style, _scene, _mismatch, _tone = generate_article_image(category, title, lead, img_path)
         if style and style != "F":
             break
     else:
