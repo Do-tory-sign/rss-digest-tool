@@ -105,11 +105,28 @@ def main():
 
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
+    from selenium.common.exceptions import NoSuchWindowException, WebDriverException
 
-    options = Options()
-    options.add_experimental_option("debuggerAddress", DEBUGGER_ADDRESS)
-    driver = webdriver.Chrome(options=options)
-    driver.get("https://www.naver.com/")
+    # 2026-07-08: 가끔 크롬 창이 뜨자마자(원인 불명 — 첫 실행 팝업/크래시 복구 등으로 추정)
+    # 닫혀버려서 "no such window: target window already closed"로 실패하는 경우가 있었음.
+    # 몇 초 텀을 두고 재시도하면 대부분 두 번째엔 정상 동작함.
+    driver = None
+    last_exc = None
+    for attempt in range(3):
+        try:
+            options = Options()
+            options.add_experimental_option("debuggerAddress", DEBUGGER_ADDRESS)
+            driver = webdriver.Chrome(options=options)
+            driver.get("https://www.naver.com/")
+            break
+        except (NoSuchWindowException, WebDriverException) as e:
+            last_exc = e
+            print(f"[naver_cookie_login] 크롬 창 접속 실패(시도 {attempt + 1}/3): {e}")
+            time.sleep(3)
+    else:
+        print(f"[naver_cookie_login] 3회 시도 모두 실패 — 갱신 건너뜀: {last_exc}")
+        sys.exit(1)
+
     for name, value in cookies.items():
         driver.add_cookie({"name": name, "value": value, "domain": ".naver.com", "path": "/"})
     driver.get("https://www.naver.com/")  # 쿠키 반영해서 새로고침
