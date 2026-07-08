@@ -20,6 +20,7 @@ jobs:
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       NAVER_COOKIES_JSON: ${{ secrets.NAVER_COOKIES_JSON }}
       NAVER_BLOG_ID: ${{ secrets.NAVER_BLOG_ID }}
+      GH_PAT_FOR_SECRETS: ${{ secrets.GH_PAT_FOR_SECRETS }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -56,3 +57,9 @@ jobs:
         run: |
           $draft = Get-ChildItem drafts\blog_draft_*.json | Sort-Object LastWriteTime -Descending | Select-Object -First 1
           python -X utf8 dotory_blog_publish.py --draft $draft.FullName
+
+      - name: 네이버 쿠키 자동 갱신 테스트
+        shell: pwsh
+        working-directory: .
+        run: python -X utf8 cloud/refresh_naver_cookies.py
+        continue-on-error: true

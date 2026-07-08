@@ -25,6 +25,7 @@ jobs:
       BRAND_NAME: ${{ secrets.BRAND_NAME }}
       NAVER_COOKIES_JSON: ${{ secrets.NAVER_COOKIES_JSON }}
       NAVER_BLOG_ID: ${{ secrets.NAVER_BLOG_ID }}
+      GH_PAT_FOR_SECRETS: ${{ secrets.GH_PAT_FOR_SECRETS }}
     steps:
       - uses: actions/checkout@v4
 
@@ -114,6 +115,12 @@ jobs:
         shell: pwsh
         run: |
           python -X utf8 main.py --slot ${{ steps.slot.outputs.slot }} --publish-only
+
+      - name: 네이버 쿠키 자동 갱신 (다음 실행을 위해 방금 쓴 세션을 다시 저장)
+        shell: pwsh
+        run: |
+          python -X utf8 cloud/refresh_naver_cookies.py
+        continue-on-error: true  # 갱신 실패해도 이번 실행 자체엔 영향 없음(다음번에 예전 쿠키로 재시도될 뿐)
 
       - name: 승인된 카드 이미지 업로드 (블로그는 로컬에서 처리 — 다운로드용)
         uses: actions/upload-artifact@v4
