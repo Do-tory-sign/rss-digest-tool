@@ -137,13 +137,16 @@ def main():
     print(f"[naver_cookie_login] 주입 전 현재 URL: {driver.current_url}, 쿠키 {len(cookies)}개 준비됨: {sorted(cookies.keys())}")
     for name, value in cookies.items():
         try:
-            # 2026-07-08: secure/sameSite를 안 넘기면 크롬이 예외 없이 조용히 쿠키를 버림 —
-            # 로컬에서 실제 네이버 쿠키를 확인해보니 둘 다 secure=True, sameSite=Lax였음
-            # (특히 SameSite=Lax/None 쿠키는 Secure 속성이 같이 없으면 최신 크롬이 거부함).
-            driver.add_cookie({
-                "name": name, "value": value, "domain": ".naver.com", "path": "/",
-                "expiry": expiry, "secure": True, "sameSite": "Lax",
+            # 2026-07-08: Selenium add_cookie()(W3C 상위 레벨)는 secure/sameSite를 맞춰줘도
+            # 에러 없이 조용히 실패했음 — CDP Network.setCookie를 직접 호출하면 성공/실패를
+            # 명시적으로 알려주므로 더 안정적. url을 주면 domain을 안 줘도 알아서 스코핑됨.
+            result = driver.execute_cdp_cmd("Network.setCookie", {
+                "name": name, "value": value, "url": "https://www.naver.com/",
+                "domain": ".naver.com", "path": "/",
+                "expires": expiry, "secure": True, "sameSite": "Lax",
             })
+            if not result.get("success", True):
+                print(f"[naver_cookie_login] CDP 쿠키 주입 실패({name}): {result}")
         except Exception as e:
             print(f"[naver_cookie_login] 쿠키 주입 실패({name}): {e}")
     cookie_names_before_reload = {c.get("name") for c in driver.get_cookies()}
