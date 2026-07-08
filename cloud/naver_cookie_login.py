@@ -134,17 +134,21 @@ def main():
     # 통일해서 판정한다.
     expiry = int(time.time()) + 60 * 60 * 24 * 30  # 30일 — 원래 쿠키의 실제 만료와 무관하게
     # 이번 크롬 프로세스 안에서는 세션 쿠키로 취급되지 않게 넉넉히 잡아둠(안전장치일 뿐).
+    print(f"[naver_cookie_login] 주입 전 현재 URL: {driver.current_url}, 쿠키 {len(cookies)}개 준비됨: {sorted(cookies.keys())}")
     for name, value in cookies.items():
         try:
             driver.add_cookie({"name": name, "value": value, "domain": ".naver.com", "path": "/", "expiry": expiry})
         except Exception as e:
             print(f"[naver_cookie_login] 쿠키 주입 실패({name}): {e}")
+    cookie_names_before_reload = {c.get("name") for c in driver.get_cookies()}
+    print(f"[naver_cookie_login] 새로고침 전 세션 쿠키: {sorted(cookie_names_before_reload)}")
     driver.get("https://www.naver.com/")  # 쿠키 반영해서 새로고침
+    print(f"[naver_cookie_login] 새로고침 후 URL: {driver.current_url}")
 
     cookie_names = {c.get("name") for c in driver.get_cookies()}
     logged_in = {"NID_AUT", "NID_SES"}.issubset(cookie_names)
     print(f"[naver_cookie_login] 로그인 상태: {'성공' if logged_in else '실패(쿠키 반영 안 됨 — 만료 또는 이상탐지)'}"
-          f" — 세션에 실제로 있는 쿠키: {sorted(cookie_names & {'NID_AUT', 'NID_SES', 'NID_JKL'})}")
+          f" — 새로고침 후 전체 쿠키: {sorted(cookie_names)}")
     if not logged_in:
         _notify_cookie_expired()
         sys.exit(1)
