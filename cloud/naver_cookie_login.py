@@ -127,13 +127,24 @@ def main():
         print(f"[naver_cookie_login] 3회 시도 모두 실패 — 갱신 건너뜀: {last_exc}")
         sys.exit(1)
 
+    # 2026-07-08: "페이지에 '로그아웃' 문구가 있는지"로 판정했었는데, 이 문구는 로그인
+    # 안 한 상태에서도 페이지 DOM에 숨겨진 채로 존재할 수 있어서 가짜 성공을 보고할 위험이
+    # 있었음(실제로 naver_engine.py의 진짜 발행 단계는 별개로 세션 만료를 계속 감지했음).
+    # naver_engine.py가 실제로 쓰는 것과 동일한 방식(쿠키 자체가 이 세션에 반영됐는지)으로
+    # 통일해서 판정한다.
+    expiry = int(time.time()) + 60 * 60 * 24 * 30  # 30일 — 원래 쿠키의 실제 만료와 무관하게
+    # 이번 크롬 프로세스 안에서는 세션 쿠키로 취급되지 않게 넉넉히 잡아둠(안전장치일 뿐).
     for name, value in cookies.items():
-        driver.add_cookie({"name": name, "value": value, "domain": ".naver.com", "path": "/"})
+        try:
+            driver.add_cookie({"name": name, "value": value, "domain": ".naver.com", "path": "/", "expiry": expiry})
+        except Exception as e:
+            print(f"[naver_cookie_login] 쿠키 주입 실패({name}): {e}")
     driver.get("https://www.naver.com/")  # 쿠키 반영해서 새로고침
 
-    page = driver.page_source
-    logged_in = "로그아웃" in page or "logout" in page.lower()
-    print(f"[naver_cookie_login] 로그인 상태: {'성공' if logged_in else '확인 불가(실패 가능성 — IP 이상탐지일 수 있음)'}")
+    cookie_names = {c.get("name") for c in driver.get_cookies()}
+    logged_in = {"NID_AUT", "NID_SES"}.issubset(cookie_names)
+    print(f"[naver_cookie_login] 로그인 상태: {'성공' if logged_in else '실패(쿠키 반영 안 됨 — 만료 또는 이상탐지)'}"
+          f" — 세션에 실제로 있는 쿠키: {sorted(cookie_names & {'NID_AUT', 'NID_SES', 'NID_JKL'})}")
     if not logged_in:
         _notify_cookie_expired()
         sys.exit(1)
