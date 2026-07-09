@@ -149,3 +149,69 @@ jobs:
         with:
           path: cloud/.dedup_marker
           key: dotory-collected-${{ steps.kst.outputs.date }}-${{ env.SLOT }}
+
+  # 2026-07-09: GitHub Actions 자체 인프라 장애("The job was not acquired by Runner")로
+  # determine-slot이 실패하는 사고가 있었음(자동 트리거는 재시도 없이 그냥 조용히 실패했음).
+  # 자동(schedule/cron_trigger) 트리거가 실패하면 사용자에게 즉시 알리고 3분 뒤 한 번 자동
+  # 재시도한다. 재시도 자체가 또 실패하면(client_payload.is_retry=true였는데도 또 실패)
+  # 무한 루프 방지를 위해 재시도하지 않고 최종 실패 알림만 보낸다. windows-latest보다
+  # 경쟁이 덜한 ubuntu-latest를 써서 이 알림/재시도 잡 자체가 러너 부족으로 막힐 확률을 낮춘다.
+  notify-and-retry-on-failure:
+    needs: determine-slot
+    if: failure() && (github.event_name == 'schedule' || github.event.action == 'cron_trigger')
+    runs-on: ubuntu-latest
+    steps:
+      - name: 슬롯 재계산 (determine-slot 실패로 output이 없음)
+        id: slot
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            slot="${{ github.event.client_payload.slot }}"
+          else
+            sched="$(echo '${{ github.event.schedule }}' | tr -s ' ')"
+            case "$sched" in
+              "0 21 * * *") slot="morning" ;;
+              "0 2 * * *")  slot="lunch" ;;
+              "0 7 * * *")  slot="evening" ;;
+              "0 12 * * *") slot="night" ;;
+              *) slot="morning" ;;
+            esac
+          fi
+          echo "slot=$slot" >> "$GITHUB_OUTPUT"
+
+      - name: 이미 재시도한 실행인지 확인 (무한 루프 방지)
+        id: retry_check
+        shell: bash
+        run: echo "is_retry=${{ github.event.client_payload.is_retry == true }}" >> "$GITHUB_OUTPUT"
+
+      - name: 텔레그램 실패+재시도 예고 알림
+        if: steps.retry_check.outputs.is_retry != 'true'
+        shell: bash
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d text="⚠️ ${{ steps.slot.outputs.slot }} 슬롯 트리거 실패(GitHub 러너 배정 문제로 추정) — 3분 뒤 자동으로 한 번 더 시도할게요."
+
+      - name: 3분 대기 후 재시도
+        if: steps.retry_check.outputs.is_retry != 'true'
+        shell: bash
+        run: sleep 180
+
+      - name: 재트리거 dispatch
+        if: steps.retry_check.outputs.is_retry != 'true'
+        shell: bash
+        run: |
+          curl -s -X POST \
+            -H "Authorization: Bearer ${{ secrets.GH_PAT_FOR_SECRETS }}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "Content-Type: application/json" \
+            "https://api.github.com/repos/${{ github.repository }}/dispatches" \
+            -d "{\"event_type\":\"cron_trigger\",\"client_payload\":{\"slot\":\"${{ steps.slot.outputs.slot }}\",\"is_retry\":true}}"
+
+      - name: 재시도도 실패한 경우 최종 알림
+        if: steps.retry_check.outputs.is_retry == 'true'
+        shell: bash
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d text="🚨 ${{ steps.slot.outputs.slot }} 슬롯: 재시도도 실패했어요. GitHub Actions 상태를 확인하고 수동으로 재시도해주세요."
