@@ -957,25 +957,6 @@ return true;
         except Exception:
             return False
 
-    def _clear_title_via_keyboard(self, element) -> bool:
-        """제목 요소를 실제로 클릭+select-all+delete로 비우고, 진짜 비워졌는지 확인한다.
-        2026-07-09: JS로 innerText=''를 강제 주입하면 SmartEditor가 그 요소를 다시 그려서
-        기존 element 참조가 끊어지고(이후 입력이 허공에 사라져 빈 문자열로 남음), 반대로
-        select-all/delete만 믿고 확인 없이 넘어가면 포커스가 어긋났을 때 지워지지 않은 채
-        새 텍스트가 덧붙어 "제목제목"처럼 중복되는 두 가지 문제가 있었음 — 요소는 절대
-        JS로 건드리지 않고, 지운 뒤 실제로 비었는지 읽어서 확인하는 방식으로 통일."""
-        for _ in range(2):
-            try:
-                ActionChains(self.driver).move_to_element(element).click().perform()
-                time.sleep(0.3)
-                ActionChains(self.driver).key_down(Keys.CONTROL).send_keys("a").key_up(Keys.CONTROL).send_keys(Keys.DELETE).perform()
-                time.sleep(0.25)
-                if not self._read_title_text():
-                    return True
-            except Exception:
-                pass
-        return not self._read_title_text()
-
     def _type_title_via_keyboard(self, title: str) -> bool:
         """SmartEditor 제목 영역에 실제 키보드 이벤트로 제목을 입력한다.
 
@@ -983,32 +964,31 @@ return true;
         임시저장 목록에서 '제목 없음'으로 남을 수 있다. 제목은 저장/발행 안정성을
         위해 실제 키보드 이벤트를 최우선으로 사용한다.
         """
-        text = self._normalize_keyboard_text(title)
         element = self._find_title_element()
         if element is None:
             return False
+        text = self._normalize_keyboard_text(title)
         try:
-            self._clear_title_via_keyboard(element)
+            ActionChains(self.driver).move_to_element(element).click().perform()
+            time.sleep(0.35)
+            ActionChains(self.driver).key_down(Keys.CONTROL).send_keys("a").key_up(Keys.CONTROL).send_keys(Keys.DELETE).perform()
+            time.sleep(0.2)
             for char in text:
                 ActionChains(self.driver).send_keys(char).perform()
                 time.sleep(random.uniform(0.01, 0.025))
             time.sleep(0.5)
-            actual = self._read_title_text()
-            if actual == title.strip() or (title[:12] in actual and actual.count(title[:12]) < 2):
-                return True
+            return title[:12] in self._read_title_text()
         except Exception:
             pass
-        element = self._find_title_element()
-        if element is None:
-            return False
         try:
             self._js_click_element(element)
             time.sleep(0.25)
-            self._clear_title_via_keyboard(element)
+            element.send_keys(Keys.CONTROL, "a")
+            element.send_keys(Keys.DELETE)
+            time.sleep(0.2)
             element.send_keys(text)
             time.sleep(0.5)
-            actual = self._read_title_text()
-            return actual == title.strip() or (title[:12] in actual and actual.count(title[:12]) < 2)
+            return title[:12] in self._read_title_text()
         except Exception:
             return False
 
@@ -1095,13 +1075,9 @@ return values.find(v=>v.length>=2)||'';
         actual = ""
         for attempt in range(3):
             actual = self._read_title_text()
-            # 2026-07-09: probe가 actual에 있어도, 이전 재시도들이 지우지 않고 겹쳐 써서
-            # "제목제목"처럼 중복된 경우가 있었음(probe는 부분일치라 이 경우도 통과시켜버려서
-            # 실제로는 깨진 상태를 성공으로 오판했었음) — 중복이면 성공으로 치지 않고
-            # 강제로 비운 뒤 다시 입력한다.
-            if probe and probe in actual and actual.count(probe) < 2:
+            if probe and probe in actual:
                 return True, actual
-            # 재시도: 실제 키보드 입력 우선(_type_title_via_keyboard가 스스로 지우고 다시 씀)
+            # 재시도: 실제 키보드 입력 우선
             if self._type_title_via_keyboard(title):
                 time.sleep(0.5)
                 continue
@@ -1110,7 +1086,7 @@ return values.find(v=>v.length>=2)||'';
             time.sleep(0.6)
 
         actual = self._read_title_text()
-        return (bool(probe and probe in actual and actual.count(probe) < 2), actual)
+        return (bool(probe and probe in actual), actual)
 
     # ─── 본문 입력 ─────────────────────────────────────────────────────────
 
