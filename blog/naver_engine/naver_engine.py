@@ -957,6 +957,30 @@ return true;
         except Exception:
             return False
 
+    def _js_force_clear_title(self) -> None:
+        """제목 영역을 JS로 강제로 비운다.
+        2026-07-09: Ctrl+A/Delete는 그 순간 포커스가 실제로 제목 요소에 있어야만 먹히는데,
+        재시도 과정에서 포커스가 어긋나면 select-all이 조용히 실패하고 그 위에 새 텍스트가
+        그대로 덧붙여져서 "제목제목"처럼 중복 입력되는 버그가 있었음(제목 검증 실패로 발행
+        중단됨). 키보드 select-all에 의존하지 않고 항상 비어있는 상태에서 시작하도록 보강."""
+        try:
+            self.driver.execute_script(
+                """
+const roots = Array.from(document.querySelectorAll('.se-title-text'));
+for (const root of roots) {
+    const nodes = root.querySelectorAll('[contenteditable="true"], .se-text-paragraph');
+    const targets = nodes.length ? Array.from(nodes) : [root];
+    for (const n of targets) {
+        const dp = Object.getOwnPropertyDescriptor(window.HTMLElement.prototype, 'innerText');
+        if (dp && dp.set) dp.set.call(n, '');
+        else n.innerText = '';
+    }
+}
+"""
+            )
+        except Exception:
+            pass
+
     def _type_title_via_keyboard(self, title: str) -> bool:
         """SmartEditor 제목 영역에 실제 키보드 이벤트로 제목을 입력한다.
 
@@ -968,6 +992,7 @@ return true;
         if element is None:
             return False
         text = self._normalize_keyboard_text(title)
+        self._js_force_clear_title()
         try:
             ActionChains(self.driver).move_to_element(element).click().perform()
             time.sleep(0.35)
@@ -977,9 +1002,11 @@ return true;
                 ActionChains(self.driver).send_keys(char).perform()
                 time.sleep(random.uniform(0.01, 0.025))
             time.sleep(0.5)
-            return title[:12] in self._read_title_text()
+            actual = self._read_title_text()
+            return actual == title.strip() or (title[:12] in actual and actual.count(title[:12]) < 2)
         except Exception:
             pass
+        self._js_force_clear_title()
         try:
             self._js_click_element(element)
             time.sleep(0.25)
@@ -988,7 +1015,8 @@ return true;
             time.sleep(0.2)
             element.send_keys(text)
             time.sleep(0.5)
-            return title[:12] in self._read_title_text()
+            actual = self._read_title_text()
+            return actual == title.strip() or (title[:12] in actual and actual.count(title[:12]) < 2)
         except Exception:
             return False
 
@@ -1075,8 +1103,13 @@ return values.find(v=>v.length>=2)||'';
         actual = ""
         for attempt in range(3):
             actual = self._read_title_text()
-            if probe and probe in actual:
+            # 2026-07-09: probe가 actual에 있어도, 이전 재시도들이 지우지 않고 겹쳐 써서
+            # "제목제목"처럼 중복된 경우가 있었음(probe는 부분일치라 이 경우도 통과시켜버려서
+            # 실제로는 깨진 상태를 성공으로 오판했었음) — 중복이면 성공으로 치지 않고
+            # 강제로 비운 뒤 다시 입력한다.
+            if probe and probe in actual and actual.count(probe) < 2:
                 return True, actual
+            self._js_force_clear_title()
             # 재시도: 실제 키보드 입력 우선
             if self._type_title_via_keyboard(title):
                 time.sleep(0.5)
@@ -1086,7 +1119,7 @@ return values.find(v=>v.length>=2)||'';
             time.sleep(0.6)
 
         actual = self._read_title_text()
-        return (bool(probe and probe in actual), actual)
+        return (bool(probe and probe in actual and actual.count(probe) < 2), actual)
 
     # ─── 본문 입력 ─────────────────────────────────────────────────────────
 
