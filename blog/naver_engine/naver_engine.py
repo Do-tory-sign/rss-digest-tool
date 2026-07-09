@@ -988,11 +988,15 @@ for (const root of roots) {
         임시저장 목록에서 '제목 없음'으로 남을 수 있다. 제목은 저장/발행 안정성을
         위해 실제 키보드 이벤트를 최우선으로 사용한다.
         """
+        text = self._normalize_keyboard_text(title)
+        # 2026-07-09: JS로 필드를 비우면 SmartEditor가 내부적으로 자식 노드를 다시 그려서
+        # 그 전에 잡아둔 element 참조가 끊어질 수 있음(끊긴 참조에 입력하면 아무 데도 안 들어가
+        # 결과가 빈 문자열로 남음) — 반드시 clear를 먼저 하고, element는 그 "다음"에 다시 찾는다.
+        self._js_force_clear_title()
+        time.sleep(0.15)
         element = self._find_title_element()
         if element is None:
             return False
-        text = self._normalize_keyboard_text(title)
-        self._js_force_clear_title()
         try:
             ActionChains(self.driver).move_to_element(element).click().perform()
             time.sleep(0.35)
@@ -1003,10 +1007,15 @@ for (const root of roots) {
                 time.sleep(random.uniform(0.01, 0.025))
             time.sleep(0.5)
             actual = self._read_title_text()
-            return actual == title.strip() or (title[:12] in actual and actual.count(title[:12]) < 2)
+            if actual == title.strip() or (title[:12] in actual and actual.count(title[:12]) < 2):
+                return True
         except Exception:
             pass
         self._js_force_clear_title()
+        time.sleep(0.15)
+        element = self._find_title_element()
+        if element is None:
+            return False
         try:
             self._js_click_element(element)
             time.sleep(0.25)
