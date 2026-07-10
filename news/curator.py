@@ -4,20 +4,27 @@ import email.utils
 from datetime import datetime
 from google import genai
 from config import GEMINI_API_KEY
-from news.collector import scrape_body
+from news.collector import KST, scrape_body
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 
 def _age_label(published: str) -> str:
-    """기사 발행일 → '오늘' / '어제' / '2일전' / '3일전'"""
+    """기사 발행일 → '오늘' / '어제' / '2일전' / '3일전'
+
+    2026-07-10: 예전엔 pub_dt.tzinfo(구글뉴스는 GMT) 기준으로 경과 시간을 계산했는데,
+    이건 collector.py의 "오늘" 판정(KST 달력 날짜 기준)과 기준 자체가 달라서 구글뉴스
+    기사가 실제로는 오늘(KST)인데도 "어제"로 잘못 라벨링되는 경우가 있었음 — 그 결과
+    큐레이션 프롬프트가 "오늘 기사만 선택"을 강제하면서 구글뉴스 후보들이 통째로
+    빠지고 연합뉴스(원래 KST라 항상 정확히 라벨링됨)만 남는 편향이 생겼음.
+    collector.py와 동일하게 KST 달력 날짜 차이로 통일한다.
+    """
     if not published:
         return ""
     try:
-        pub_dt = email.utils.parsedate_to_datetime(published)
-        now = datetime.now(pub_dt.tzinfo)
-        diff = (now - pub_dt).days
-        return ["오늘", "어제", "2일전", "3일전"][min(diff, 3)]
+        pub_dt = email.utils.parsedate_to_datetime(published).astimezone(KST)
+        diff = (datetime.now(KST).date() - pub_dt.date()).days
+        return ["오늘", "어제", "2일전", "3일전"][min(max(diff, 0), 3)]
     except Exception:
         return ""
 
