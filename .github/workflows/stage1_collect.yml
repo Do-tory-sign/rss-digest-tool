@@ -90,7 +90,17 @@ jobs:
         run: |
           $kst = [System.TimeZoneInfo]::FindSystemTimeZoneById("Korea Standard Time")
           $nowKst = [System.TimeZoneInfo]::ConvertTimeFromUtc((Get-Date).ToUniversalTime(), $kst)
-          echo "date=$($nowKst.ToString('yyyyMMdd'))" >> $env:GITHUB_OUTPUT
+          # 2026-07-10: GitHub 장애 등으로 night(21시) 슬롯이 자정을 넘겨 지연 실행되면(예: 00:17
+          # KST), 그 시점의 "오늘 날짜"는 이미 다음 날짜라서 dedup 캐시가 "다음 날 야식은 이미
+          # 수집됨"으로 잘못 저장돼, 그날 진짜 21시 야식 트리거가 조용히 스킵되는 사고가 있었음
+          # (텔레그램이 아예 안 옴). night 슬롯이 자정 이후 이른 시간(정오 이전)에 도는 경우는
+          # 항상 "전날 밤의 지연 실행"이므로, 이때만 날짜를 하루 되돌려서 캐시 키가 실제 대상
+          # 날짜(전날)를 가리키게 한다.
+          $date = $nowKst.ToString('yyyyMMdd')
+          if ("$env:SLOT" -eq "night" -and $nowKst.Hour -lt 12) {
+            $date = $nowKst.AddDays(-1).ToString('yyyyMMdd')
+          }
+          echo "date=$date" >> $env:GITHUB_OUTPUT
 
       - name: 오늘 이 슬롯 이미 수집됐는지 확인 (cron 중복 실행 방지)
         id: dedup
