@@ -30,7 +30,7 @@ from nacl import encoding, public
 
 from naver_engine.config import DEBUGGER_ADDRESS
 
-REPO = "Do-tory-sign/Do.story_news"
+REPO = "Do-tory-sign/rss-digest-tool"
 SECRET_NAME = "NAVER_COOKIES_JSON"
 COOKIE_NAMES = {"NID_AUT", "NID_SES"}
 

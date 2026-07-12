@@ -58,7 +58,7 @@ def main():
     OUTPUT_PATH.write_text(json.dumps(found, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"[extract_naver_cookies] 쿠키 {len(found)}개 저장 완료: {OUTPUT_PATH}")
     print("다음 명령으로 GitHub Secret 등록:")
-    print(f'  gh secret set NAVER_COOKIES_JSON -R Do-tory-sign/Do.story_news < "{OUTPUT_PATH}"')
+    print(f'  gh secret set NAVER_COOKIES_JSON -R Do-tory-sign/rss-digest-tool < "{OUTPUT_PATH}"')
 
 
 if __name__ == "__main__":

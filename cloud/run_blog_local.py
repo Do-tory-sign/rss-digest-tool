@@ -18,7 +18,8 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-REPO = "Do-tory-sign/Do.story_news"
+sys.path.insert(0, str(ROOT))
+REPO = "Do-tory-sign/rss-digest-tool"
 GH = r"C:\Program Files\GitHub CLI\gh.exe"
 
 
