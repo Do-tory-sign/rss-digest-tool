@@ -69,7 +69,11 @@ def main():
     if not cookies_json:
         print("[naver_cookie_login] NAVER_COOKIES_JSON 환경변수가 없음")
         sys.exit(1)
-    cookies = json.loads(cookies_json)
+    # 2026-07-14: Secret 등록 시 PowerShell `Get-Content -Raw`가 UTF-8 BOM을 붙여서
+    # json.loads가 "Unexpected UTF-8 BOM"으로 통째로 실패한 사고가 있었음 — 이 스텝이
+    # 죽으면 이후 블로그 발행 단계에서 크롬이 아예 안 켜진 것처럼 보여 원인 파악이 어려웠음.
+    # 앞으로 등록 실수가 또 있어도 조용히 넘어가도록 BOM을 미리 벗겨낸다.
+    cookies = json.loads(cookies_json.lstrip("﻿"))
 
     chrome = _find_chrome()
     if not chrome:
