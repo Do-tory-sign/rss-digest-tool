@@ -1336,7 +1336,13 @@ let unbolded = 0, bolded = 0;
 // — <b>/<strong>/굵은 인라인 스타일을 모두 검사 대상에 포함한다.
 const boldEls = Array.from(doc.querySelectorAll('b, strong, [style*="font-weight"]'));
 for (const b of boldEls) {
-  const t = (b.textContent || '').trim();
+  // 2026-07-14: <b> 자체의 텍스트만 보고 "|"로 시작하는지 검사했더니, 아래쪽
+  // 소제목들은 "|" 글자가 <b> 밖의 별도 노드에 있는 구조라서 이 검사에 걸려
+  // 정상 소제목까지 벗겨지는 버그가 있었음(위쪽 소제목만 살아남고 아래쪽은
+  // 계속 안 굵게 나오는 원인) — <b> 자체가 아니라 그 <b>가 속한 문단
+  // 전체 텍스트를 기준으로 판단한다.
+  const para = b.closest('.se-text-paragraph') || b.parentNode;
+  const t = (para ? para.textContent : b.textContent || '').trim();
   if (t.startsWith('|')) continue;
   if (b.tagName === 'B' || b.tagName === 'STRONG') {
     const parent = b.parentNode;
