@@ -64,12 +64,14 @@ def _fresh_curation(exclude_categories: list = None) -> dict:
     다른 슬롯에서 이미 쓴 카테고리는 제외해 하루 안 카테고리가 안 겹치게 한다."""
     from news.collector import fetch_all_news
     from news.curator import curate_any
-    from news_archive import get_used_links
+    from news_archive import get_used_links, get_used_headlines
 
     news, _health = fetch_all_news()
     used_links = get_used_links(days=7)  # 오늘 다른 슬롯에서 이미 쓴 기사도 자동 포함됨
+    used_headlines = get_used_headlines(days=3)  # 링크 달라도 같은 사건이면 걸러내기 위함
     print(f"\n[v2] Gemini 큐레이션 중 (카테고리 무관, 제외: {exclude_categories or '없음'})...")
-    result = curate_any(news, used_links, exclude_categories=exclude_categories)
+    result = curate_any(news, used_links, exclude_categories=exclude_categories,
+                         used_headlines=used_headlines)
     picked_cat = result.pop("_picked_category", "hot")
     print(f"[v2] 선정된 카테고리: {picked_cat}")
     return {picked_cat: result}

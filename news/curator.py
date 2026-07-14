@@ -261,10 +261,13 @@ def curate_culture(articles: list[dict], used_links: set = None) -> dict:
     return _fill_from_article(result, articles)
 
 
-def curate_any(news_by_cat: dict, used_links: set = None, exclude_categories: list = None) -> dict:
+def curate_any(news_by_cat: dict, used_links: set = None, exclude_categories: list = None,
+               used_headlines: list = None) -> dict:
     """2026-07-02: 하루 4슬롯(아침/점심/저녁/야식)이 더 이상 카테고리에 고정되지 않고,
     그 시간대 전체 후보(hot+economy+culture) 중 가장 화제성 높은 기사 하나를 뽑는다.
-    exclude_categories: 오늘 다른 슬롯에서 이미 쓴 카테고리 — 같은 날 카테고리 중복 방지."""
+    exclude_categories: 오늘 다른 슬롯에서 이미 쓴 카테고리 — 같은 날 카테고리 중복 방지.
+    used_headlines: 최근 사용된 헤드라인 — 링크는 달라도 같은 사건이면 걸러내기 위함
+    (2026-07-14, 중복 기사 반복 선정 문제 대응)."""
     exclude_categories = set(exclude_categories or [])
     pools = {cat: arts for cat, arts in news_by_cat.items() if cat not in exclude_categories}
     if not pools:
@@ -280,10 +283,20 @@ def curate_any(news_by_cat: dict, used_links: set = None, exclude_categories: li
             a["_cat"] = cat
             combined.append(a)
 
+    recent_text = ""
+    if used_headlines:
+        joined = "\n".join(f"- {h}" for h in used_headlines)
+        recent_text = f"""
+
+아래는 최근 며칠간 이미 다룬 헤드라인입니다. 링크나 언론사가 다르더라도 같은
+사건/이슈를 다루는 기사는 절대 다시 선택하지 마세요 (후속 보도, 종합 기사 포함):
+{joined}"""
+
     prompt = SYSTEM_PREFIX + f"""다음은 지금 이 시간대의 뉴스 후보 전체 목록입니다
 (핫이슈·경제/IT·트렌드/문화 카테고리 구분 없이 전부 섞여있음):
 
 {_news_list_text(combined, limit=len(combined))}
+{recent_text}
 
 카테고리 상관없이, 지금 가장 화제성 높고 사람들이 궁금해할 기사 하나만 선택해
 아래 JSON으로 응답하세요:

@@ -21,6 +21,25 @@ def get_used_links(days: int = 7) -> set:
     return links
 
 
+def get_used_headlines(days: int = 3) -> list:
+    """최근 N일간 사용된 헤드라인 반환 (중복 방지용).
+
+    2026-07-14: 링크만으로 중복 판정하면, 같은 사건을 다루는 "다른" 기사(다른 언론사
+    후속 보도, 종합 기사 등)는 링크가 달라서 그대로 통과돼 같은 이야기가 며칠씩
+    반복 선정되는 문제가 있었음 — 헤드라인 목록을 큐레이션 프롬프트에 같이 넘겨서
+    Gemini가 "같은 사건인지" 의미 단위로 판단해 걸러내게 한다."""
+    if not DATA_FILE.exists():
+        return []
+    data = json.loads(DATA_FILE.read_text(encoding="utf-8"))
+    headlines = []
+    for entry in data[:days]:
+        for item in entry.get("news", []):
+            headline = item.get("headline") or item.get("card_headline")
+            if headline:
+                headlines.append(headline)
+    return headlines
+
+
 def get_week_data() -> list:
     """이번 주 월~토 데이터 반환 (일요일에 호출). Mon→Sat 순서."""
     from datetime import timedelta
