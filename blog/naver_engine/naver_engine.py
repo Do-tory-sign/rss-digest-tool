@@ -1330,14 +1330,22 @@ const frame = document.querySelector('iframe.se-iframe, iframe[name="mainFrame"]
 const doc = frame ? frame.contentDocument : document;
 let unbolded = 0, bolded = 0;
 // 1) 소제목이 아닌데 굵은 것 -> 벗김
-const bolds = Array.from(doc.querySelectorAll('b'));
-for (const b of bolds) {
+// 2026-07-14: <b> 태그만 검사했더니, 토글(Ctrl+B) 상태가 새서 굵어진 본문이
+// <strong>이나 인라인 style="font-weight"로 들어간 경우를 놓쳐서 본문이 통째로
+// 굵게 남는 사고가 있었음(소제목은 안 굵고 본문만 굵은, 완전히 뒤바뀐 형태로 발행됨)
+// — <b>/<strong>/굵은 인라인 스타일을 모두 검사 대상에 포함한다.
+const boldEls = Array.from(doc.querySelectorAll('b, strong, [style*="font-weight"]'));
+for (const b of boldEls) {
   const t = (b.textContent || '').trim();
   if (t.startsWith('|')) continue;
-  const parent = b.parentNode;
-  if (!parent) continue;
-  while (b.firstChild) parent.insertBefore(b.firstChild, b);
-  parent.removeChild(b);
+  if (b.tagName === 'B' || b.tagName === 'STRONG') {
+    const parent = b.parentNode;
+    if (!parent) continue;
+    while (b.firstChild) parent.insertBefore(b.firstChild, b);
+    parent.removeChild(b);
+  } else {
+    b.style.fontWeight = '';
+  }
   unbolded++;
 }
 // 2) "|"로 시작하는 문단인데 굵게 안 된 것 -> 강제로 굵게
