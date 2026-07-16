@@ -1,10 +1,14 @@
 """Cloud Billing 예산 알림(Pub/Sub)을 확인해서 텔레그램으로 중계한다.
 
-Gemini API는 Cloud Billing이 아니라 AI Studio 자체 선불 크레딧으로 관리되지만, 결제 계정에
-등록해둔 "제미니 API 잔액 알림" 예산(월 ₩16,000, 50/90/94/100% 임계값)이 지출 시점마다
-Pub/Sub 토픽(gemini-budget-alerts)으로 메시지를 보낸다. GitHub Actions에는 Cloud Function
-같은 상시 리스너를 못 두므로, 이 스크립트를 주기적으로 실행해서 구독(gemini-budget-alerts-sub)
-에 쌓인 메시지를 꺼내(pull) 텔레그램으로 보내고 ack 처리한다.
+결제 계정에 등록해둔 "제미니 API 잔액 알림" 예산(월 ₩16,000, 50/90/94/100% 임계값)이
+지출 시점마다 Pub/Sub 토픽(gemini-budget-alerts)으로 메시지를 보낸다. GitHub Actions에는
+Cloud Function 같은 상시 리스너를 못 두므로, 이 스크립트를 주기적으로 실행해서 구독
+(gemini-budget-alerts-sub)에 쌓인 메시지를 꺼내(pull) 텔레그램으로 보내고 ack 처리한다.
+
+2026-07-17: 계정을 선불(prepay)에서 후불(postpay)로 전환함 — 예산 알림 자체(Cloud Billing
+기능)는 선불/후불과 무관하게 그대로 동작하지만, "크레딧이 0이 되면 API가 멈춘다"는 선불
+특유의 셧다운 개념이 더 이상 적용되지 않는다. 알림 문구를 "잔액 소진 경고"가 아니라
+"이번 달 지출이 예산 대비 얼마나 됐는지 알려주는 정보성 알림"으로 바꿈.
 
 사용법:
     python cloud/check_gemini_budget_alert.py
@@ -79,17 +83,18 @@ def main():
         if cost is None or budget is None:
             continue
 
-        remaining = budget - cost
         pct = (cost / budget * 100) if budget else 0
         print(f"[check_gemini_budget_alert] {name}: {cost}/{budget} {currency} ({pct:.1f}%)")
 
+        # 후불이라 크레딧 잔액이 0이 돼도 API가 안 멈춤 — "남은 크레딧" 대신
+        # 예산 대비 지출률을 그대로 보여주는 정보성 알림으로 표시.
         text = (
             f"💰 {name}\n\n"
-            f"지출: {cost:,.0f}{currency} / {budget:,.0f}{currency} ({pct:.1f}%)\n"
-            f"남은 크레딧(추정): {remaining:,.0f}{currency}"
+            f"이번 달 지출: {cost:,.0f}{currency} / 예산 {budget:,.0f}{currency} ({pct:.1f}%)\n"
+            f"(후불 결제라 이 예산을 넘어도 서비스는 계속돼요 — 참고용 알림이에요)"
         )
-        if remaining <= 2000:
-            text = "⚠️ 제미니 API 크레딧이 얼마 안 남았어요!\n\n" + text
+        if pct >= 100:
+            text = "📈 제미니 API 이번 달 지출이 설정 예산을 넘었어요!\n\n" + text
         if best is None or pct > best[0]:
             best = (pct, text)
 
