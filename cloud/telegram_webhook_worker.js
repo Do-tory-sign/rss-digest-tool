@@ -33,10 +33,19 @@ export default {
       return new Response("bad request", { status: 400 });
     }
 
+    // 2026-07-17: "피드백 남기고 다시 그리기" 버튼 → force_reply로 텍스트를 받아서,
+    // 그 답장(callback_query가 아니라 일반 message 업데이트)을 여기서 처리한다.
+    // 상태 저장소 없이(서버리스라 KV 없이도 되게) 우리가 보낸 프롬프트 메시지 자체에
+    // 마커([[FB|eventType|slot]])를 심어두고, reply_to_message.text에서 그 마커를
+    // 다시 읽어 어떤 재생성인지 복원한다.
+    const msg = update.message;
+    if (msg && !update.callback_query) {
+      await handleFeedbackReply(env, msg);
+      return new Response("ok", { status: 200 });
+    }
+
     const cq = update.callback_query;
     if (!cq) {
-      // 기사/카드 승인과 무관한 업데이트(피드백 답장 등)는 일단 200만 반환.
-      // 피드백 답장 처리(force_reply)는 2단계 개선 과제로 남겨둠 — 우선은 버튼 흐름만 지원.
       return new Response("ok", { status: 200 });
     }
 
@@ -61,6 +70,26 @@ export default {
       card_reject: "cards_rejected",
       image_regen: "image_regen",
     };
+    // 피드백 프롬프트를 띄우기만 하는 버튼(실제 재생성 이벤트가 아님) — 눌리면
+    // force_reply 메시지를 보내고 끝. 실제 재생성은 사용자가 답장했을 때 일어난다.
+    const FEEDBACK_PROMPT_MAP = {
+      art_image_fb: "article_image_regen",
+      image_fb: "image_regen",
+    };
+    if (FEEDBACK_PROMPT_MAP[action]) {
+      await telegramApi(env, "answerCallbackQuery", { callback_query_id: cq.id });
+      await telegramApi(env, "sendMessage", {
+        chat_id: chatId,
+        text:
+          `📝 [${slot}] 그림에 반영할 피드백을 이 메시지에 "답장(reply)"으로 입력해주세요.\n\n` +
+          `예: "도토리 꼬리/돌기 없애줘", "배경을 사무실 대신 법원으로", "인물을 여성으로 바꿔줘"\n` +
+          `구체적인 시각 요소 하나를 한 문장으로 지목할수록 잘 반영돼요.\n\n` +
+          `[[FB|${FEEDBACK_PROMPT_MAP[action]}|${slot}]]`,
+        reply_markup: JSON.stringify({ force_reply: true, selective: true }),
+      });
+      return new Response("ok", { status: 200 });
+    }
+
     const eventType = EVENT_MAP[action];
 
     // 텔레그램에 즉시 응답(로딩 스피너 제거) — GitHub 호출 결과와 무관하게 먼저 처리
@@ -95,6 +124,31 @@ export default {
     return new Response("ok", { status: 200 });
   },
 };
+
+async function handleFeedbackReply(env, msg) {
+  const replyTo = msg.reply_to_message;
+  const feedbackText = (msg.text || "").trim();
+  if (!replyTo || !replyTo.text || !feedbackText) return;
+
+  const m = replyTo.text.match(/\[\[FB\|([a-z_]+)\|([a-z]+)\]\]/);
+  if (!m) return; // 우리가 심어둔 마커가 있는 메시지에 대한 답장이 아니면 무시
+
+  const eventType = m[1];
+  const slot = m[2];
+
+  await telegramApi(env, "sendMessage", {
+    chat_id: msg.chat.id,
+    text: `🎨 피드백 반영해서 다시 그릴게요: "${feedbackText}"`,
+  });
+
+  const dispatchOk = await githubDispatch(env, eventType, { slot, feedback: feedbackText });
+  if (!dispatchOk) {
+    await telegramApi(env, "sendMessage", {
+      chat_id: msg.chat.id,
+      text: `⚠️ GitHub Actions 트리거 실패 (${eventType}, slot=${slot}) — Actions 탭에서 수동 확인 필요`,
+    });
+  }
+}
 
 async function telegramApi(env, method, body) {
   try {

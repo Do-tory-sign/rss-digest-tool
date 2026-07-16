@@ -49,21 +49,27 @@ jobs:
           restore-keys: |
             dotory-output-
 
-      - name: 슬롯 추출
+      - name: 슬롯/피드백 추출
         id: p
         shell: pwsh
         run: |
           if ("${{ github.event_name }}" -eq "workflow_dispatch") {
             $slot = "${{ inputs.slot }}"
+            $feedback = "${{ inputs.feedback }}"
           } else {
+            # 2026-07-17: repository_dispatch(텔레그램 버튼/피드백 답장)로 들어올 때는
+            # inputs.feedback이 항상 빈 값이라(workflow_dispatch 전용) 실제로 사용자가
+            # 답장으로 남긴 피드백이 무시되고 있었음 — client_payload에서 직접 꺼내온다.
             $slot = python cloud/dispatch_payload.py slot
+            $feedback = python cloud/dispatch_payload.py feedback
           }
           echo "slot=$slot" >> $env:GITHUB_OUTPUT
+          echo "feedback=$feedback" >> $env:GITHUB_OUTPUT
 
       - name: 그림 재생성 + 기사 승인 메시지 재전송
         shell: pwsh
         run: |
-          python cloud/regen_article_image_and_notify.py --slot ${{ steps.p.outputs.slot }} --feedback "${{ inputs.feedback }}"
+          python cloud/regen_article_image_and_notify.py --slot ${{ steps.p.outputs.slot }} --feedback "${{ steps.p.outputs.feedback }}"
 
       - name: 갱신된 산출물 재저장
         uses: actions/cache/save@v4

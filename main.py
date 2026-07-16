@@ -272,12 +272,15 @@ def regenerate_single_card(slot: str, card_name: str) -> Path | None:
         return None
 
 
-def regenerate_article_image(slot: str) -> list[Path] | None:
+def regenerate_article_image(slot: str, feedback: str = "") -> list[Path] | None:
     """기사 내용(제목/본문 등)은 그대로 두고 메인 일러스트(article["image"])만 다시 그린 뒤,
     그 일러스트를 쓰는 카드(cover/fact/why/outlook 등)를 전부 다시 렌더링한다.
     2026-07-06: 카드별 "재생성" 버튼은 캐릭터 포즈만 바뀌고 배경 일러스트는 그대로였음
     (모든 카드가 같은 article["image"]를 공유해서 그림) — "그림만 다시 만들고 싶다"는
-    요청은 이 일러스트 자체를 다시 생성해야 해결됨."""
+    요청은 이 일러스트 자체를 다시 생성해야 해결됨.
+    2026-07-17: feedback(사용자가 텔레그램 답장으로 남긴 구체적 수정 요청)을 추가 —
+    카드별 재생성은 포즈 라이브러리에서 고르기만 할 뿐 AI로 새로 그리지 않으므로
+    (아래 참고), "그림 자체"에 대한 피드백은 전부 여기(공유 일러스트)로 들어와야 함."""
     from news.article_image import generate_article_image
 
     today = config.now_kst().strftime("%Y%m%d")
@@ -292,7 +295,8 @@ def regenerate_article_image(slot: str) -> list[Path] | None:
     lead = article.get("lead") or article.get("card_summary", "")
 
     for attempt in range(3):
-        style, _scene, _mismatch, _tone = generate_article_image(category, title, lead, img_path)
+        style, _scene, _mismatch, _tone = generate_article_image(
+            category, title, lead, img_path, feedback=feedback)
         if style and style != "F":
             break
     else:

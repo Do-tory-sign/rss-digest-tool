@@ -3,6 +3,17 @@ name: "메인 그림 재생성 (기사 내용 유지)"
 on:
   repository_dispatch:
     types: [image_regen]
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: "슬롯"
+        required: true
+        type: choice
+        options: [morning, lunch, evening, night]
+      feedback:
+        description: "그림에 반영할 피드백"
+        required: false
+        type: string
 
 env:
   PYTHONIOENCODING: "utf-8"
@@ -38,17 +49,24 @@ jobs:
           restore-keys: |
             dotory-output-
 
-      - name: 슬롯 추출
+      - name: 슬롯/피드백 추출
         id: p
         shell: pwsh
         run: |
-          $slot = python cloud/dispatch_payload.py slot
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $slot = "${{ inputs.slot }}"
+            $feedback = "${{ inputs.feedback }}"
+          } else {
+            $slot = python cloud/dispatch_payload.py slot
+            $feedback = python cloud/dispatch_payload.py feedback
+          }
           echo "slot=$slot" >> $env:GITHUB_OUTPUT
+          echo "feedback=$feedback" >> $env:GITHUB_OUTPUT
 
       - name: 메인 그림 재생성 + 카드 전체 재조립 + 재전송
         shell: pwsh
         run: |
-          python cloud/regen_image_and_notify.py --slot ${{ steps.p.outputs.slot }}
+          python cloud/regen_image_and_notify.py --slot ${{ steps.p.outputs.slot }} --feedback "${{ steps.p.outputs.feedback }}"
 
       - name: 갱신된 산출물 재저장
         uses: actions/cache/save@v4

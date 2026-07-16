@@ -130,6 +130,10 @@ def cmd_send_article(args):
             # "기사 내용은 좋은데 그림만 별로다" 케이스에 대응이 안 됐음 — 기사(제목/본문)는
             # 그대로 두고 일러스트만 다시 그리는 버튼 추가.
             [{"text": "🎨 그림만 다시 그리기 (기사 내용 유지)", "callback_data": f"art_image_regen|{slot}"}],
+            # 2026-07-17: "그림만 다시 그리기"는 매번 완전히 새로 그려서 뭐가 마음에 안 드는지
+            # 반영할 방법이 없었음 — 텔레그램 답장으로 구체적 피드백을 받아서 다음 재생성에
+            # 반영하는 버튼 추가(cloud/telegram_webhook_worker.js가 force_reply로 받음).
+            [{"text": "📝 피드백 남기고 다시 그리기", "callback_data": f"art_image_fb|{slot}"}],
             [{"text": "❌ 반려 (오늘 이 게시물 취소)", "callback_data": f"art_reject|{slot}"}],
         ]
     }
@@ -192,6 +196,10 @@ def cmd_send_cards(args):
             # 그대로라 "그림 자체가 마음에 안 든다"는 피드백을 반영할 방법이 없었음 — 일러스트
             # 자체를 다시 그리고 그걸 쓰는 카드를 전부 재조립하는 버튼을 추가.
             [{"text": "🎨 그림만 다시 그리기 (기사 내용 유지)", "callback_data": f"image_regen|{slot}"}],
+            # 2026-07-17: 카드별 재생성(위 🔄 버튼들)은 포즈 라이브러리에서 고르기만 할 뿐
+            # AI로 새로 그리지 않음 — "그림 자체"에 대한 피드백은 항상 이 공유 일러스트
+            # 재생성으로 들어가야 실제로 반영됨. 텔레그램 답장으로 구체적 피드백을 받는다.
+            [{"text": "📝 피드백 남기고 다시 그리기", "callback_data": f"image_fb|{slot}"}],
         ]
     }
     msg_id = _send_message(
