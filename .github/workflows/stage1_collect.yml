@@ -1,13 +1,17 @@
 name: "Stage 1 - 뉴스 수집 + 기사 승인 요청"
 
-# 하루 4슬롯(아침06/점심11/저녁16/야식21, 한국시간=UTC+9) 정각에 실행.
-# cron은 UTC 기준이므로 9시간을 빼서 등록한다: 06,11,16,21 KST -> 21(전날),02,07,12 UTC
+# 하루 4슬롯(발행 목표 아침06/점심11/저녁16/야식21시:55, 한국시간=UTC+9) — 실제 발행
+# 시각의 2시간 전에 기사를 수집/선택한다(2026-07-15: 기존엔 1시간 전이라, 중복 기사
+# 감지로 재선택하거나 이미지를 여러 번 재생성하게 되면 :55 발행 시각을 놓치는 경우가
+# 있었음 — 여유를 1시간 더 줌. 발행 게이팅(stage3의 :55 대기)은 그대로 유지되므로
+# 실제 발행 시각 자체는 안 바뀜, 수집이 더 일찍 시작될 뿐).
+# cron은 UTC 기준이므로 9시간을 빼서 등록한다: 04,09,14,19 KST -> 19(전날),00,05,10 UTC
 on:
   schedule:
-    - cron: "0 21 * * *"  # 06:00 KST (전날 21:00 UTC) -> morning
-    - cron: "0 2 * * *"   # 11:00 KST -> lunch
-    - cron: "0 7 * * *"   # 16:00 KST -> evening
-    - cron: "0 12 * * *"  # 21:00 KST -> night
+    - cron: "0 19 * * *"  # 04:00 KST (전날 19:00 UTC) -> morning (06:55 발행 목표)
+    - cron: "0 0 * * *"   # 09:00 KST -> lunch (11:55 발행 목표)
+    - cron: "0 5 * * *"   # 14:00 KST -> evening (16:55 발행 목표)
+    - cron: "0 10 * * *"  # 19:00 KST -> night (21:55 발행 목표)
   workflow_dispatch:
     inputs:
       slot:
@@ -48,10 +52,10 @@ jobs:
             # 정규화한 뒤 비교한다(이 버그로 저녁/점심 cron이 또 morning으로 잘못 떨어졌었음).
             $sched = ("${{ github.event.schedule }}" -replace '\s+', ' ').Trim()
             switch ($sched) {
-              "0 21 * * *" { $slot = "morning" }
-              "0 2 * * *"  { $slot = "lunch" }
-              "0 7 * * *"  { $slot = "evening" }
-              "0 12 * * *" { $slot = "night" }
+              "0 19 * * *" { $slot = "morning" }
+              "0 0 * * *"  { $slot = "lunch" }
+              "0 5 * * *"  { $slot = "evening" }
+              "0 10 * * *" { $slot = "night" }
               default { $slot = "morning" }
             }
           }
