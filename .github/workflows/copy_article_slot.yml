@@ -59,7 +59,15 @@ jobs:
         run: |
           $kst = [System.TimeZoneInfo]::FindSystemTimeZoneById("Korea Standard Time")
           $nowKst = [System.TimeZoneInfo]::ConvertTimeFromUtc((Get-Date).ToUniversalTime(), $kst)
-          echo "date=$($nowKst.ToString('yyyyMMdd'))" >> $env:GITHUB_OUTPUT
+          # 2026-07-17: stage1_collect.yml에 있는 야식 자정 넘김 dedup 날짜 롤백 로직이
+          # 이 워크플로우엔 없어서, 이 워크플로우로 자정 이후~정오 이전에 night로 복사하면
+          # dedup 캐시가 dotory-collected-<다음날짜>-night로 잘못 저장되는 동일한 사고가
+          # 재발할 수 있음(코드 리뷰로 발견) — stage1_collect.yml과 동일한 규칙 적용.
+          $date = $nowKst.ToString('yyyyMMdd')
+          if ("${{ inputs.to_slot }}" -eq "night" -and $nowKst.Hour -lt 12) {
+            $date = $nowKst.AddDays(-1).ToString('yyyyMMdd')
+          }
+          echo "date=$date" >> $env:GITHUB_OUTPUT
 
       - name: 중복 실행 방지 표시 저장
         shell: pwsh

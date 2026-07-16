@@ -1334,7 +1334,17 @@ let unbolded = 0, bolded = 0;
 // <strong>이나 인라인 style="font-weight"로 들어간 경우를 놓쳐서 본문이 통째로
 // 굵게 남는 사고가 있었음(소제목은 안 굵고 본문만 굵은, 완전히 뒤바뀐 형태로 발행됨)
 // — <b>/<strong>/굵은 인라인 스타일을 모두 검사 대상에 포함한다.
-const boldEls = Array.from(doc.querySelectorAll('b, strong, [style*="font-weight"]'));
+const BOLD_SEL = 'b, strong, [style*="font-weight"]';
+// 2026-07-17: [style*="font-weight"]는 값 상관없이 속성 존재만 보는 부분 문자열 매칭이라
+// font-weight:normal(의도적으로 굵기를 상쇄하는 인라인 스타일)까지 "굵음"으로 오판해서
+// unbold 처리(=값을 비움) 대상에 넣고 있었음 — 실제로 안 굵던 곳까지 사이드이펙트로
+// 건드릴 수 있어서, 계산된 폰트굵기가 진짜 굵은 경우만 대상으로 좁힌다(코드 리뷰로 발견).
+const isActuallyBold = (el) => {
+  if (el.tagName === 'B' || el.tagName === 'STRONG') return true;
+  const fw = (getComputedStyle ? getComputedStyle(el).fontWeight : el.style.fontWeight) || '';
+  return fw === 'bold' || (parseInt(fw, 10) >= 600);
+};
+const boldEls = Array.from(doc.querySelectorAll(BOLD_SEL)).filter(isActuallyBold);
 for (const b of boldEls) {
   // 2026-07-14: <b> 자체의 텍스트만 보고 "|"로 시작하는지 검사했더니, 아래쪽
   // 소제목들은 "|" 글자가 <b> 밖의 별도 노드에 있는 구조라서 이 검사에 걸려
@@ -1359,7 +1369,10 @@ const paras = doc.querySelectorAll('.se-text-paragraph');
 for (const p of paras) {
   const t = (p.textContent || '').trim();
   if (!t.startsWith('|')) continue;
-  if (p.querySelector('b')) continue;  // 이미 굵음
+  // 2026-07-17: "이미 굵음" 판정이 <b>만 봐서, 1)번 패스가 넓힌 굵기 정의(strong/인라인
+  // 스타일)로 이미 굵게 들어간 소제목을 "안 굵음"으로 잘못 보고 <b>를 이중으로 덧씌우는
+  // 버그가 있었음(코드 리뷰로 발견) — 동일한 굵기 판정 기준을 재사용한다.
+  if (Array.from(p.querySelectorAll(BOLD_SEL)).some(isActuallyBold)) continue;  // 이미 굵음
   const spans = p.querySelectorAll('span.__se-node');
   for (const sp of spans) {
     if (!sp.textContent || !sp.textContent.trim()) continue;

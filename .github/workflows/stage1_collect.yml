@@ -183,12 +183,16 @@ jobs:
           if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
             slot="${{ github.event.client_payload.slot }}"
           else
+            # 2026-07-17: 이 case문이 예전 cron 시각("0 21/2/7/12 * * *")을 그대로 쓰고
+            # 있었음 — 위쪽 determine-slot의 스케줄이 이미 01/10/15/20시로 바뀐 뒤였는데
+            # 여기는 안 고쳐서, 실패 알림/재시도가 항상 default(morning)로 잘못 떨어지고
+            # 있었음(코드 리뷰로 발견). determine-slot과 동일한 cron 표현식으로 맞춘다.
             sched="$(echo '${{ github.event.schedule }}' | tr -s ' ')"
             case "$sched" in
-              "0 21 * * *") slot="morning" ;;
-              "0 2 * * *")  slot="lunch" ;;
-              "0 7 * * *")  slot="evening" ;;
-              "0 12 * * *") slot="night" ;;
+              "0 16 * * *") slot="morning" ;;
+              "0 1 * * *")  slot="lunch" ;;
+              "0 6 * * *")  slot="evening" ;;
+              "0 11 * * *") slot="night" ;;
               *) slot="morning" ;;
             esac
           fi

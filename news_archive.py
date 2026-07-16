@@ -32,7 +32,13 @@ def get_used_headlines(days: int = 3) -> list:
         return []
     data = json.loads(DATA_FILE.read_text(encoding="utf-8"))
     headlines = []
+    # 2026-07-17: save_weekly_summary()가 쓰는 {"type": "weekly", ...} 항목은 "news" 키가
+    # 아니라 키워드 한두 단어를 담은 별개 구조라, 걸러내지 않으면 최근 3일 안에 일요일
+    # 주간요약이 끼었을 때 엉뚱한 단어가 "최근 헤드라인"으로 프롬프트에 섞여 들어감
+    # (코드 리뷰로 발견).
     for entry in data[:days]:
+        if entry.get("type") == "weekly":
+            continue
         for item in entry.get("news", []):
             headline = item.get("headline") or item.get("card_headline")
             if headline:

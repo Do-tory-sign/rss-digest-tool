@@ -129,8 +129,12 @@ async function handleFeedbackReply(env, msg) {
   const replyTo = msg.reply_to_message;
   const feedbackText = (msg.text || "").trim();
   if (!replyTo || !replyTo.text || !feedbackText) return;
+  // 2026-07-17 보안 수정(코드 리뷰로 발견): 마커 정규식만 검사하면, 채팅방 안의 아무
+  // 메시지(포워딩된 텍스트, 다른 사람이 마커 문자열을 그대로 인용한 메시지 등)에 답장해도
+  // 트리거될 수 있었음 — 반드시 "봇 자신이 보낸 메시지"에 대한 답장일 때만 처리한다.
+  if (!replyTo.from?.is_bot) return;
 
-  const m = replyTo.text.match(/\[\[FB\|([a-z_]+)\|([a-z]+)\]\]/);
+  const m = replyTo.text.match(/\[\[FB\|([a-z_]+)\|([a-z_]+)\]\]/);
   if (!m) return; // 우리가 심어둔 마커가 있는 메시지에 대한 답장이 아니면 무시
 
   const eventType = m[1];
