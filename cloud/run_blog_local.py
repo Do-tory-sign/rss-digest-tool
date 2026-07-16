@@ -85,7 +85,7 @@ def main():
         raise RuntimeError("블로그 초안 생성 실패")
 
     subprocess.run(
-        [sys.executable, "-X", "utf8", "dotory_blog_publish.py", "--draft", draft_path],
+        [sys.executable, "-X", "utf8", "dotory_blog_publish.py", "--draft", draft_path, "--publish"],
         cwd=blog_dir,
     )
 

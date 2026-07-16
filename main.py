@@ -381,8 +381,9 @@ def run(slot: str, dry_run: bool = False, publish_only: bool = False) -> bool:
 
     # 인스타 업로드 다음 순서로 블로그 초안 작성 — 인스타/블로그는 서로 다른 시스템(Graph API vs
     # 셀레니움 브라우저 자동화)이라 동시에 돌리면 크롬 세션 충돌 위험만 커서 순차로 진행한다.
-    # 2026-07-02: 기본은 임시저장까지만(자동 발행 안 함) — 사람이 최종 확인 후 네이버에서
-    # 직접 발행하는 게 안전하다는 기존 원칙 유지.
+    # 2026-07-02: 원래 기본은 임시저장까지만(자동 발행 안 함) — 사람이 최종 확인 후 네이버에서
+    # 직접 발행하는 게 안전하다는 원칙이었으나, 2026-07-17 자동 발행(--publish)으로 전환함
+    # (사용자 확인이 늦어질 때마다 발행이 계속 밀리는 게 더 큰 문제였음).
     import os
     if os.environ.get("SKIP_BLOG") == "1":
         # 2026-07-06: 클라우드(GitHub Actions) 런너에는 네이버 로그인 세션이 없음(Phase 2
@@ -401,8 +402,13 @@ def run(slot: str, dry_run: bool = False, publish_only: bool = False) -> bool:
                 if line.startswith("[BLOG_DRAFT]"):
                     draft_path = line.split("[BLOG_DRAFT]", 1)[1].strip()
             if draft_path:
+                # 2026-07-17: 그동안 임시저장까지만 하고 사람이 네이버에서 직접 발행하게
+                # 해뒀는데(2026-07-02 도입, 자동화 버그 안전장치), 사용자가 승인을 늦게
+                # 확인하는 경우가 잦아서 그만큼 발행이 계속 늦어지는 문제가 더 커짐 —
+                # --publish로 바로 발행까지 진행하도록 전환.
                 publish_result = subprocess.run(
-                    [sys.executable, "-X", "utf8", "dotory_blog_publish.py", "--draft", draft_path],
+                    [sys.executable, "-X", "utf8", "dotory_blog_publish.py",
+                     "--draft", draft_path, "--publish"],
                     cwd=blog_dir,
                 )
                 if publish_result.returncode != 0:
