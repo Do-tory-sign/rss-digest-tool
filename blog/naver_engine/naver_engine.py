@@ -1233,7 +1233,7 @@ return true;
         except Exception:
             pass
 
-    def _insert_bold_via_html(self, text: str) -> bool:
+    def _insert_bold_via_html(self, text: str, color: str | None = None) -> bool:
         """Ctrl+B 토글은 붙여넣기 직후 상태 확인이 불안정해서(레이스 컨디션으로
         꺼짐 토글이 씹혀 이후 본문 전체가 계속 굵게 나오는 버그, 2026-07-02) 색 없이
         굵게만 필요한 구간(소제목)은 토글 없이 <b> HTML을 직접 삽입해 확실하게 처리한다.
@@ -1256,10 +1256,16 @@ return true;
         레이스가 발생함(소제목+본문 통째로 merge, 이미지 순서도 꼬임, 2026-07-02).
         JS로 Selection을 건드리지 않고, 삽입 직후 네이티브 키보드 이벤트(End 키)만으로
         커서를 <b> 밖으로 빼내 스마트에디터 자체 이벤트 리스너가 정상적으로 인식하게 한다."""
+        # 2026-07-17: 소제목은 항상 굵게+색이 같이 붙는데({{head:...}}), 색이 있으면 이
+        # 함수를 안 타고 예전 Ctrl+B 토글 경로로 빠지고 있었음 — 그게 바로 이 파일 곳곳에
+        # 기록된 "토글 상태가 새는" 고질적 버그의 실제 발생 지점이었음(라이브 디버깅으로
+        # 확인). 색도 <b>의 인라인 style로 같이 삽입해서 토글을 아예 안 타게 한다.
         js = """
 const text = arguments[0];
+const color = arguments[1];
 const esc = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-return document.execCommand('insertHTML', false, '<b>' + esc + '</b>');
+const styleAttr = color ? (' style="color:' + color + '"') : '';
+return document.execCommand('insertHTML', false, '<b' + styleAttr + '>' + esc + '</b>');
 """
         verify_js = """
 const text = arguments[0];
@@ -1288,7 +1294,7 @@ for (const el of spans) {
 return false;
 """
         try:
-            self.driver.execute_script(js, text)
+            self.driver.execute_script(js, text, color)
         except Exception:
             return False
         # 커서를 <b> 밖으로 — 네이티브 End 키(실제 브라우저 키 이벤트)만 사용, JS로
@@ -1396,21 +1402,31 @@ return unbolded + '/' + bolded;
         if font_size and str(font_size) != DEFAULT_FONT_SIZE:
             self._set_font_size(font_size)
             self._size_dirty = True   # 이후 일반 텍스트에서 기본크기 재적용 보장
-        if color:
-            self._set_text_color(color)
         normalized = self._normalize_keyboard_text(text)
-        if bold and not color and self._insert_bold_via_html(normalized):
-            pass  # HTML 삽입으로 이미 굵게 처리됨 — 토글 불필요
-        else:
-            if bold:
+        if bold:
+            # 2026-07-17: 예전엔 "굵게+색"(소제목, {{head:...}})일 때만 색이 있다는 이유로
+            # 이 안전한 HTML 삽입을 건너뛰고 Ctrl+B 토글 경로로 빠졌음 — 소제목은 항상
+            # 굵게+색 조합이라, 사실상 모든 소제목이 그 토글 버그에 계속 노출되고 있었던
+            # 게 근본 원인이었음. 색도 같이 HTML로 삽입해서 토글을 아예 안 타게 한다.
+            if self._insert_bold_via_html(normalized, color=color):
+                pass  # HTML 삽입으로 굵기+색 모두 이미 처리됨 — 토글/툴바 불필요
+            else:
+                # HTML 삽입 자체가 실패한 경우에만 예전 토글 경로로 폴백
+                if color:
+                    self._set_text_color(color)
                 self._send_shortcut(Keys.CONTROL, "b")
+                self._paste_segment(normalized)
+                self._send_shortcut(Keys.CONTROL, "b")
+                if color:
+                    self._set_text_color(DEFAULT_TEXT_COLOR)
+        elif color:
+            self._set_text_color(color)
             # 강조 구간은 '붙여넣기'로 원자적 입력 — char 단위 타이핑 시 툴바 드롭다운 직후
             # 포커스/IME 경합으로 같은 단어가 두 번 들어가는 중복(예: 임영웅임영웅) 방지.
             self._paste_segment(normalized)
-            if bold:
-                self._send_shortcut(Keys.CONTROL, "b")
-        if color:
             self._set_text_color(DEFAULT_TEXT_COLOR)
+        else:
+            self._paste_segment(normalized)
         if font_size and str(font_size) != DEFAULT_FONT_SIZE:
             # 1차 리셋 시도(가끔 툴바에서 누락 → _size_dirty로 다음 일반 텍스트에서 재보강)
             self._set_font_size(DEFAULT_FONT_SIZE)
