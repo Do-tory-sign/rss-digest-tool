@@ -1293,9 +1293,14 @@ for (const el of spans) {
 }
 return false;
 """
+        # 2026-07-17: 굵기 버그가 근본 수정(색 포함 HTML 삽입) 이후에도 재발해서, 다음에
+        # 또 재발하면 "안전 경로 자체가 실패해서 토글로 폴백된 건지" vs "다른 원인인지"를
+        # 바로 구분할 수 있게 각 단계 결과를 로그로 남긴다(추측 대신 증거로 다음 조치 결정).
+        preview = (text or "")[:20]
         try:
             self.driver.execute_script(js, text, color)
-        except Exception:
+        except Exception as e:
+            self._log(f"[naver] HTML 굵게 삽입 실패(exec 자체 예외, '{preview}'): {e}")
             return False
         # 커서를 <b> 밖으로 — 네이티브 End 키(실제 브라우저 키 이벤트)만 사용, JS로
         # Selection/Range를 직접 건드리지 않는다 (스마트에디터 내부 커서 상태와 어긋나서
@@ -1308,8 +1313,9 @@ return false;
         try:
             if bool(self.driver.execute_script(verify_js, text)):
                 return True
-        except Exception:
-            pass
+        except Exception as e:
+            self._log(f"[naver] HTML 굵게 삽입 검증 중 예외('{preview}'): {e}")
+        self._log(f"[naver] HTML 굵게 삽입 1차 검증 실패, 보정 시도('{preview}')")
         # 보정 시도
         try:
             self.driver.execute_script(repair_js, text)
@@ -1319,8 +1325,11 @@ return false;
                 ActionChains(self.driver).send_keys(Keys.END).perform()
             except Exception:
                 pass
+            if not ok:
+                self._log(f"[naver] HTML 굵게 삽입 보정도 실패 — 토글 경로로 폴백됨('{preview}')")
             return ok
-        except Exception:
+        except Exception as e:
+            self._log(f"[naver] HTML 굵게 삽입 보정 중 예외('{preview}'): {e} — 토글 경로로 폴백됨")
             return False
 
     def _strip_stray_bold(self) -> None:
