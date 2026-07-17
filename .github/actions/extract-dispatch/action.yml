@@ -1,17 +1,15 @@
+# workflow_dispatch(수동 실행) 또는 repository_dispatch(텔레그램 버튼/자동 트리거)로 들어온
+# 슬롯과 부가값(피드백/카드명 등)을 하나로 통일해서 꺼낸다.
+#
+# 2026-07-17: stage1_collect.yml을 뺀 5개 워크플로우가 이 "슬롯 결정" 로직을 각자 복붙해서
+# 갖고 있었음 — 코드 리뷰에서 이 중복이 실제 버그(피드백 텍스트가 한 워크플로우에서만
+# 반영됨)의 원인이 됐던 걸 발견하고 공용 액션으로 뽑아냄.
+#
+# 주의: 피드백처럼 사용자가 자유롭게 쓴 텍스트는 절대 이 액션 바깥의 run 스크립트
+# 본문에 직접 치환하지 말 것 — 반드시 이 액션의 outputs를 env 매핑으로 받아서 사용할 것
+# (PowerShell 인젝션 방지).
 name: "슬롯/부가값 추출"
-description: >
-  workflow_dispatch(수동 실행) 또는 repository_dispatch(텔레그램 버튼/자동 트리거)로
-  들어온 슬롯과 부가값(피드백/카드명 등)을 하나로 통일해서 꺼낸다.
-
-  2026-07-17: stage1_collect.yml을 뺀 5개 워크플로우(stage2_cards, stage3_publish,
-  article_image_regen, image_regen, card_regen)가 이 "슬롯 결정" 로직을 각자
-  복붙해서 갖고 있었음 — 코드 리뷰에서 이 중복이 실제 버그(피드백 텍스트가 반영
-  안 됨)의 원인이 됐던 걸 발견하고, 앞으로 같은 실수가 한 곳만 고쳐지고 나머지는
-  안 고쳐지는 걸 막기 위해 공용 액션으로 뽑아냄.
-
-  피드백처럼 사용자가 자유롭게 쓴 텍스트가 들어올 수 있는 값은 절대 이 액션
-  바깥의 run: 스크립트 본문에 `${{ }}`로 직접 치환하지 말 것 — 반드시 이 액션의
-  outputs를 env: 매핑으로 받아서 사용할 것(PowerShell 인젝션 방지).
+description: "workflow_dispatch 또는 repository_dispatch에서 슬롯/부가값을 통일해서 꺼낸다"
 
 inputs:
   manual_slot:
