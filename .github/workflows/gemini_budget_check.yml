@@ -13,6 +13,11 @@ jobs:
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       BRAND_NAME: ${{ secrets.BRAND_NAME }}
       GEMINI_BUDGET_RELAY_SA_JSON: ${{ secrets.GEMINI_BUDGET_RELAY_SA_JSON }}
+      # 2026-07-17: 선불(prepay)/후불(postpay)에 따라 예산 초과 시 실제로 서비스가
+      # 멈추는지가 다름 — 계정을 바꿀 때 이 값만 바꾸면 알림 문구가 같이 바뀌게 설정으로
+      # 뺐다(하드코딩하면 나중에 다시 선불로 돌아갔을 때 "괜찮다"고 잘못 안내하게 됨).
+      # 값: "postpay"(기본) 또는 "prepay"
+      GEMINI_BILLING_MODE: "postpay"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

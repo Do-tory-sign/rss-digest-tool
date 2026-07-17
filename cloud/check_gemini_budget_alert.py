@@ -7,13 +7,15 @@ Cloud Function 같은 상시 리스너를 못 두므로, 이 스크립트를 주
 
 2026-07-17: 계정을 선불(prepay)에서 후불(postpay)로 전환함 — 예산 알림 자체(Cloud Billing
 기능)는 선불/후불과 무관하게 그대로 동작하지만, "크레딧이 0이 되면 API가 멈춘다"는 선불
-특유의 셧다운 개념이 더 이상 적용되지 않는다. 알림 문구를 "잔액 소진 경고"가 아니라
-"이번 달 지출이 예산 대비 얼마나 됐는지 알려주는 정보성 알림"으로 바꿈.
+특유의 셧다운 개념은 후불일 때는 적용되지 않는다. 처음엔 이 문구 차이를 코드에 그냥
+하드코딩했는데(코드 리뷰 지적) — 나중에 다시 선불로 돌아가면 "괜찮다"고 잘못 안내하게
+되므로, GEMINI_BILLING_MODE 환경변수("postpay" 기본값 / "prepay")로 분기한다.
 
 사용법:
     python cloud/check_gemini_budget_alert.py
 필요 환경변수:
     GEMINI_BUDGET_RELAY_SA_JSON — 이 작업 전용 서비스 계정 키(Pub/Sub 구독자 권한만 있음)
+    GEMINI_BILLING_MODE — "postpay"(기본) 또는 "prepay"
 """
 from __future__ import annotations
 
@@ -35,6 +37,7 @@ SUBSCRIPTION_ID = "gemini-budget-alerts-sub"
 
 
 def main():
+    billing_mode = os.environ.get("GEMINI_BILLING_MODE", "postpay").strip().lower()
     sa_json = os.environ.get("GEMINI_BUDGET_RELAY_SA_JSON", "")
     if not sa_json:
         print("[check_gemini_budget_alert] GEMINI_BUDGET_RELAY_SA_JSON 환경변수 없음")
@@ -86,15 +89,25 @@ def main():
         pct = (cost / budget * 100) if budget else 0
         print(f"[check_gemini_budget_alert] {name}: {cost}/{budget} {currency} ({pct:.1f}%)")
 
-        # 후불이라 크레딧 잔액이 0이 돼도 API가 안 멈춤 — "남은 크레딧" 대신
-        # 예산 대비 지출률을 그대로 보여주는 정보성 알림으로 표시.
-        text = (
-            f"💰 {name}\n\n"
-            f"이번 달 지출: {cost:,.0f}{currency} / 예산 {budget:,.0f}{currency} ({pct:.1f}%)\n"
-            f"(후불 결제라 이 예산을 넘어도 서비스는 계속돼요 — 참고용 알림이에요)"
-        )
-        if pct >= 100:
-            text = "📈 제미니 API 이번 달 지출이 설정 예산을 넘었어요!\n\n" + text
+        if billing_mode == "prepay":
+            # 선불: 크레딧 잔액이 0이 되면 API 키가 실제로 멈춘다 — 잔액 소진 경고로 표시.
+            remaining = budget - cost
+            text = (
+                f"💰 {name}\n\n"
+                f"지출: {cost:,.0f}{currency} / {budget:,.0f}{currency} ({pct:.1f}%)\n"
+                f"남은 크레딧(추정): {remaining:,.0f}{currency}"
+            )
+            if remaining <= 2000:
+                text = "⚠️ 제미니 API 크레딧이 얼마 안 남았어요!\n\n" + text
+        else:
+            # 후불(기본): 예산을 넘어도 서비스가 안 멈춤 — 정보성 지출 알림으로 표시.
+            text = (
+                f"💰 {name}\n\n"
+                f"이번 달 지출: {cost:,.0f}{currency} / 예산 {budget:,.0f}{currency} ({pct:.1f}%)\n"
+                f"(후불 결제라 이 예산을 넘어도 서비스는 계속돼요 — 참고용 알림이에요)"
+            )
+            if pct >= 100:
+                text = "📈 제미니 API 이번 달 지출이 설정 예산을 넘었어요!\n\n" + text
         if best is None or pct > best[0]:
             best = (pct, text)
 
