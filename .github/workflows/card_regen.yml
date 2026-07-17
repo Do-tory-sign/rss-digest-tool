@@ -40,17 +40,17 @@ jobs:
 
       - name: 슬롯/카드명 추출
         id: p
-        shell: pwsh
-        run: |
-          $slot = python cloud/dispatch_payload.py slot
-          $card = python cloud/dispatch_payload.py extra
-          echo "slot=$slot" >> $env:GITHUB_OUTPUT
-          echo "card=$card" >> $env:GITHUB_OUTPUT
+        uses: ./.github/actions/extract-dispatch
+        with:
+          extra_key: extra
 
       - name: 카드 재생성 + 재전송 (main.py의 regenerate_single_card 재사용)
         shell: pwsh
+        env:
+          SLOT: ${{ steps.p.outputs.slot }}
+          CARD: ${{ steps.p.outputs.extra }}
         run: |
-          python cloud/regen_card_and_notify.py --slot ${{ steps.p.outputs.slot }} --card ${{ steps.p.outputs.card }}
+          python cloud/regen_card_and_notify.py --slot $env:SLOT --card $env:CARD
 
       - name: 갱신된 산출물 재저장
         uses: actions/cache/save@v4

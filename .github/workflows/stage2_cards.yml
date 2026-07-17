@@ -42,14 +42,9 @@ jobs:
 
       - name: 슬롯 결정 (dispatch payload 또는 수동 입력)
         id: slot
-        shell: pwsh
-        run: |
-          if ("${{ github.event_name }}" -eq "repository_dispatch") {
-            $slot = python cloud/dispatch_payload.py slot
-          } else {
-            $slot = "${{ inputs.slot }}"
-          }
-          echo "slot=$slot" >> $env:GITHUB_OUTPUT
+        uses: ./.github/actions/extract-dispatch
+        with:
+          manual_slot: ${{ inputs.slot }}
 
       # 주의: 이전 Stage 1 실행이 만든 D:/Dotory/Cardnews/output/<날짜>/ 데이터가 이
       # 러너에 남아있어야 한다. GitHub-hosted 러너는 매 job마다 새 VM이라 상태가

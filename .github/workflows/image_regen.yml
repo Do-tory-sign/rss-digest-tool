@@ -51,32 +51,19 @@ jobs:
 
       - name: 슬롯/피드백 추출
         id: p
-        shell: pwsh
-        # 2026-07-17 보안 수정: article_image_regen.yml과 동일한 이유로, 텔레그램 답장
-        # 텍스트를 run: 스크립트 본문에 직접 치환하지 않고 env: 매핑을 거쳐 전달한다
-        # (PowerShell 인젝션 방지 — 이 잡도 GEMINI_API_KEY 등 시크릿을 env로 가짐).
-        env:
-          IN_SLOT: ${{ inputs.slot }}
-          IN_FEEDBACK: ${{ inputs.feedback }}
-        run: |
-          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-            $slot = $env:IN_SLOT
-            $feedback = $env:IN_FEEDBACK
-          } else {
-            $slot = python cloud/dispatch_payload.py slot
-            $feedback = python cloud/dispatch_payload.py feedback
-          }
-          echo "slot=$slot" >> $env:GITHUB_OUTPUT
-          # 멀티라인 피드백이 GITHUB_OUTPUT 파싱을 깨지 않도록 안전 구분자 문법 사용
-          echo "feedback<<GHOUTPUT_FEEDBACK_EOF" >> $env:GITHUB_OUTPUT
-          echo "$feedback" >> $env:GITHUB_OUTPUT
-          echo "GHOUTPUT_FEEDBACK_EOF" >> $env:GITHUB_OUTPUT
+        uses: ./.github/actions/extract-dispatch
+        with:
+          manual_slot: ${{ inputs.slot }}
+          manual_extra: ${{ inputs.feedback }}
+          extra_key: feedback
 
       - name: 메인 그림 재생성 + 카드 전체 재조립 + 재전송
         shell: pwsh
+        # PowerShell 인젝션 방지 — 피드백은 항상 env: 매핑으로만 전달(자세한 이유는
+        # article_image_regen.yml 참고, 이 잡도 GEMINI_API_KEY 등 시크릿을 env로 가짐).
         env:
           SLOT: ${{ steps.p.outputs.slot }}
-          FEEDBACK: ${{ steps.p.outputs.feedback }}
+          FEEDBACK: ${{ steps.p.outputs.extra }}
         run: |
           python cloud/regen_image_and_notify.py --slot $env:SLOT --feedback "$env:FEEDBACK"
 
