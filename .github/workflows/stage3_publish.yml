@@ -25,7 +25,6 @@ jobs:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       BRAND_NAME: ${{ secrets.BRAND_NAME }}
-      GH_PAT_FOR_SECRETS: ${{ secrets.GH_PAT_FOR_SECRETS }}
       # 2026-07-19: 네이버 블로그 자동 발행은 이용약관(자동화된 수단으로 로그인/게시 금지) 위반
       # 소지가 있고, 클라우드 러너는 매번 새 IP/기기 지문이라 이상탐지에 더 취약함 — 사이트+인스타는
       # 계속 클라우드에서 처리하되, 블로그만 SKIP_BLOG=1로 건너뛰고 로컬(run_blog_local.py)에서

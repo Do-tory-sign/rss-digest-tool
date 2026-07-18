@@ -199,88 +199,82 @@ def _prompt_dotory(scene: dict, feedback: str = "") -> str:
 {STYLE_BASE}"""
 
 
-def _has_text(image_bytes: bytes) -> bool:
-    """생성 이미지에 글자가 들어갔는지 Gemini 비전으로 검사. 판단 불가 시 통과(False)."""
+def _vision_check(image_bytes: bytes, question: str) -> bool:
+    """이미지에 대해 yes/no 질문 하나를 Gemini 비전으로 검사. 판단 불가 시 통과(False).
+    2026-07-19: _has_text/_has_tail이 이 골격을 각자 복붙하고 있었어서 공용 헬퍼로 뽑음."""
     try:
         resp = client.models.generate_content(
             model=CLASSIFY_MODELS[0],
-            contents=[
-                types.Part.from_bytes(data=image_bytes, mime_type="image/png"),
-                "이 이미지 안에 글자(한글, 영어, 숫자, 문자처럼 보이는 표기)가 있나요? "
-                "단, 국기 문양(태극기의 검은 4괘 막대 포함)은 글자가 아니므로 제외하고 판단하세요. "
-                "'yes' 또는 'no' 한 단어만 답하세요.",
-            ],
+            contents=[types.Part.from_bytes(data=image_bytes, mime_type="image/png"), question],
         )
         return "yes" in resp.text.strip().lower()
     except Exception:
         return False
+
+
+def _has_text(image_bytes: bytes) -> bool:
+    """생성 이미지에 글자가 들어갔는지 검사."""
+    return _vision_check(
+        image_bytes,
+        "이 이미지 안에 글자(한글, 영어, 숫자, 문자처럼 보이는 표기)가 있나요? "
+        "단, 국기 문양(태극기의 검은 4괘 막대 포함)은 글자가 아니므로 제외하고 판단하세요. "
+        "'yes' 또는 'no' 한 단어만 답하세요.",
+    )
 
 
 def _has_tail(image_bytes: bytes) -> bool:
-    """도토리 캐릭터 몸통 아래쪽(다리 사이 포함)에 꼬리/돌기가 그려졌는지 Gemini 비전으로 검사.
+    """도토리 캐릭터 몸통 아래쪽(다리 사이 포함)에 꼬리/돌기가 그려졌는지 검사.
     2026-07-18: 프롬프트에 이미 강한 금지 규칙이 있고 사용자 피드백까지 반영해도 이 디테일만은
     텍스트 지시로 안정적으로 통제가 안 돼서(이미지 생성 모델의 습관성 아티팩트로 추정),
-    전체 재생성 대신 국소 인페인팅으로 잡는 전용 검사를 추가함. 판단 불가 시 통과(False)."""
-    try:
-        resp = client.models.generate_content(
-            model=CLASSIFY_MODELS[0],
-            contents=[
-                types.Part.from_bytes(data=image_bytes, mime_type="image/png"),
-                "이 이미지 속 도토리(캐릭터) 몸통 아래쪽을 자세히 보세요. 다리 사이나 몸통 바닥에서 "
-                "아래로 튀어나오거나 돌출된 작은 돌기·뿔·꼭지·꼬리 모양이 있나요? "
-                "(정상은 다리/발을 제외하면 몸통 바닥이 매끈하고 둥근 곡면이어야 함) "
-                "그런 돌출부가 있으면 'yes', 없거나 도토리 캐릭터가 아예 없으면 'no' 한 단어만 답하세요.",
-            ],
-        )
-        return "yes" in resp.text.strip().lower()
-    except Exception:
-        return False
+    전체 재생성 대신 국소 인페인팅으로 잡는 전용 검사를 추가함."""
+    return _vision_check(
+        image_bytes,
+        "이 이미지 속 도토리(캐릭터) 몸통 아래쪽을 자세히 보세요. 다리 사이나 몸통 바닥에서 "
+        "아래로 튀어나오거나 돌출된 작은 돌기·뿔·꼭지·꼬리 모양이 있나요? "
+        "(정상은 다리/발을 제외하면 몸통 바닥이 매끈하고 둥근 곡면이어야 함) "
+        "그런 돌출부가 있으면 'yes', 없거나 도토리 캐릭터가 아예 없으면 'no' 한 단어만 답하세요.",
+    )
 
 
-def _remove_tail_inpaint(image_bytes: bytes) -> bytes | None:
-    """도토리 몸통 아래쪽 돌기/꼬리만 국소 편집으로 지운다. 텍스트 인페인팅(_remove_text_inpaint)과
-    동일하게, 전체 재생성보다 구도·인물·색감 유지율이 훨씬 높아서 감지 시 1순위로 시도."""
+def _inpaint(image_bytes: bytes, instruction: str) -> bytes | None:
+    """이미지의 일부만 지시에 따라 국소 편집한다(전체 재생성 아님). 2026-06-28 테스트(4/4 성공)
+    결과 전체 재생성보다 구도·인물·색감 유지율이 훨씬 높아서 문제 감지 시 1순위로 시도.
+    실패하면 호출부가 기존 전체 재생성으로 폴백한다.
+    2026-07-19: _remove_text_inpaint/_remove_tail_inpaint이 이 골격을 각자 복붙하고 있었어서
+    공용 헬퍼로 뽑음."""
     try:
         resp = client.models.generate_content(
             model=IMAGE_MODEL,
-            contents=[
-                types.Part.from_bytes(data=image_bytes, mime_type="image/png"),
-                "이 이미지 속 도토리 캐릭터의 몸통 아래쪽(다리 사이 포함)에 튀어나온 작은 돌기·뿔·꼭지·"
-                "꼬리 모양이 있다면 지워주세요. 그 자리는 몸통과 같은 색·질감으로 매끈하고 둥글게 "
-                "이어지도록 자연스럽게 채우세요 (다리/발은 그대로 유지). 나머지 구도·배경·다른 요소는 "
-                "전부 그대로 유지하세요.",
-            ],
+            contents=[types.Part.from_bytes(data=image_bytes, mime_type="image/png"), instruction],
             config=types.GenerateContentConfig(image_config=types.ImageConfig(aspect_ratio="1:1")),
         )
         for part in resp.candidates[0].content.parts:
             if part.inline_data and len(part.inline_data.data) >= MIN_IMAGE_BYTES:
                 return part.inline_data.data
     except Exception as e:
-        print(f"[article_image] 돌기 인페인팅 편집 실패: {e}")
+        print(f"[article_image] 인페인팅 편집 실패: {e}")
     return None
 
 
 def _remove_text_inpaint(image_bytes: bytes) -> bytes | None:
-    """이미지에 글자가 감지됐을 때, 전체를 다시 그리지 않고 글자만 지우는 부분 편집 시도.
-    2026-06-28 테스트(4/4 성공) 결과 전체 재생성보다 구도·인물·색감 유지율이 훨씬 높아서
-    글자 감지 시 1순위로 시도. 실패하면 호출부가 기존 전체 재생성으로 폴백한다."""
-    try:
-        resp = client.models.generate_content(
-            model=IMAGE_MODEL,
-            contents=[
-                types.Part.from_bytes(data=image_bytes, mime_type="image/png"),
-                "이 이미지에서 글자·문구·자막·숫자 표기 부분만 지워주세요. 글자가 있던 자리는 "
-                "같은 배경 톤·질감으로 자연스럽게 채우고, 나머지 구도·인물·색감·조명은 전부 "
-                "그대로 유지하세요. 어떤 문자도 남기지 마세요.",
-            ],
-            config=types.GenerateContentConfig(image_config=types.ImageConfig(aspect_ratio="1:1")),
-        )
-        for part in resp.candidates[0].content.parts:
-            if part.inline_data and len(part.inline_data.data) >= MIN_IMAGE_BYTES:
-                return part.inline_data.data
-    except Exception as e:
-        print(f"[article_image] 글자 인페인팅 편집 실패: {e}")
-    return None
+    """글자가 감지됐을 때 글자만 지우는 부분 편집."""
+    return _inpaint(
+        image_bytes,
+        "이 이미지에서 글자·문구·자막·숫자 표기 부분만 지워주세요. 글자가 있던 자리는 "
+        "같은 배경 톤·질감으로 자연스럽게 채우고, 나머지 구도·인물·색감·조명은 전부 "
+        "그대로 유지하세요. 어떤 문자도 남기지 마세요.",
+    )
+
+
+def _remove_tail_inpaint(image_bytes: bytes) -> bytes | None:
+    """도토리 몸통 아래쪽 돌기/꼬리만 지우는 부분 편집."""
+    return _inpaint(
+        image_bytes,
+        "이 이미지 속 도토리 캐릭터의 몸통 아래쪽(다리 사이 포함)에 튀어나온 작은 돌기·뿔·꼭지·"
+        "꼬리 모양이 있다면 지워주세요. 그 자리는 몸통과 같은 색·질감으로 매끈하고 둥글게 "
+        "이어지도록 자연스럽게 채우세요 (다리/발은 그대로 유지). 나머지 구도·배경·다른 요소는 "
+        "전부 그대로 유지하세요.",
+    )
 
 
 def _trim_and_square(image_bytes: bytes, ratio: float = 1.0) -> bytes:
@@ -478,7 +472,9 @@ def _fallback(category: str, out_path: Path) -> bool:
     src = FALLBACK_DIR / f"{category}.png"
     if src.exists():
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_bytes(src.read_bytes())
+        # 2026-07-19: 폴백 원본 자산이 옛 16:9 시절 그대로라 그냥 복사하면 카드 슬롯(1:1)에서
+        # background-size:cover가 더 세게 크롭함 — 나머지 파이프라인과 동일하게 정사각으로 맞춤
+        out_path.write_bytes(_trim_and_square(src.read_bytes()))
         print(f"[article_image] 폴백 일러스트 사용: {src.name}")
         return True
     print(f"[article_image] 폴백 일러스트도 없음: {src}")

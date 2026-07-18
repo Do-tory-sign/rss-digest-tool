@@ -9,6 +9,13 @@ output/<date>/<slot>_*.png 로 복원한 뒤 blog/dotory_blog_draft.py + dotory_
 
 사용법:
     python -X utf8 cloud/run_blog_local.py --slot night
+    python -X utf8 cloud/run_blog_local.py --slot night --run-id 123456789  # 특정 run 지정
+
+--run-id 없이 실행하면 "가장 최근 성공한 stage3 run"을 그냥 가져오는데, 두 슬롯의 stage3
+run이 짧은 간격으로 연달아 성공하면(예: watch_and_publish_blog.py의 폴링 주기 안에 두 건이
+겹치는 경우) 엉뚱한 run에서 approved-cards-<slot> 아티팩트를 찾다가 실패하거나 다른 슬롯의
+데이터를 가져올 수 있음(2026-07-19 코드 리뷰에서 발견) — watch_and_publish_blog.py처럼
+호출부가 이미 슬롯에 맞는 run_id를 알고 있다면 반드시 --run-id로 넘길 것.
 """
 from __future__ import annotations
 
@@ -34,19 +41,23 @@ def _run(args: list) -> str:
 
 def main():
     if "--slot" not in sys.argv:
-        print("사용법: python cloud/run_blog_local.py --slot morning|lunch|evening|night")
+        print("사용법: python cloud/run_blog_local.py --slot morning|lunch|evening|night [--run-id <id>]")
         sys.exit(2)
     slot = sys.argv[sys.argv.index("--slot") + 1]
+    run_id = sys.argv[sys.argv.index("--run-id") + 1] if "--run-id" in sys.argv else None
 
-    print(f"[run_blog_local] [{slot}] stage3 최신 성공 run 조회 중...")
-    out = _run([GH, "run", "list", "-R", REPO, "--workflow", "stage3_publish.yml",
-                "--status", "success", "--limit", "5",
-                "--json", "databaseId,createdAt"])
-    import json
-    runs = json.loads(out)
-    if not runs:
-        raise RuntimeError("성공한 stage3 run이 없음")
-    run_id = runs[0]["databaseId"]
+    if run_id:
+        print(f"[run_blog_local] [{slot}] 지정된 run {run_id} 사용")
+    else:
+        print(f"[run_blog_local] [{slot}] stage3 최신 성공 run 조회 중...")
+        out = _run([GH, "run", "list", "-R", REPO, "--workflow", "stage3_publish.yml",
+                    "--status", "success", "--limit", "5",
+                    "--json", "databaseId,createdAt"])
+        import json
+        runs = json.loads(out)
+        if not runs:
+            raise RuntimeError("성공한 stage3 run이 없음")
+        run_id = runs[0]["databaseId"]
 
     dest = ROOT / "cloud" / "_artifact_tmp"
     dest.mkdir(parents=True, exist_ok=True)

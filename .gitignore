@@ -38,6 +38,7 @@ node_modules/
 
 # 로컬 블로그 발행 감시(watch_and_publish_blog.py) 런타임 상태
 cloud/.blog_watch_state.json
+cloud/.blog_watch.lock
 cloud/_artifact_tmp/
 
 # OS

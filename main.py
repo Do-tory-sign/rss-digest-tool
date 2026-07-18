@@ -29,15 +29,6 @@ import config
 from pipeline_lock import pipeline_lock
 
 
-def _mark_blog_failed(slot: str) -> None:
-    """2026-07-18: 클라우드에서 블로그 발행만 실패했을 때(네이버 로그인 일시적 튕김 등),
-    stage3_publish.yml이 이 마커 파일 존재 여부로 판단해 별도 잡에서 블로그만 자동
-    재시도하게 한다. 사이트/인스타는 이미 성공했으므로 절대 그것들까지 다시 돌리면 안 됨
-    (인스타 중복 게시 위험) — 그래서 재시도는 블로그 단계만 독립적으로 다시 수행한다."""
-    try:
-        Path("cloud/.blog_publish_failed").write_text(slot, encoding="utf-8")
-    except Exception:
-        pass
 from image.html_composer import compose_cover_explain, compose_explain_card, compose_outro
 from instagram.uploader_graph import upload_carousel
 from news_archive import save_today
@@ -428,10 +419,8 @@ def run(slot: str, dry_run: bool = False, publish_only: bool = False) -> bool:
                 )
                 if publish_result.returncode != 0:
                     print(f"[main] 블로그 발행 단계 실패 (exit code {publish_result.returncode})")
-                    _mark_blog_failed(slot)
             else:
                 print(f"[main] 블로그 초안 생성 실패:\n{draft_result.stdout}\n{draft_result.stderr}")
-                _mark_blog_failed(slot)
                 try:
                     from notify import notify_failure
                     notify_failure(f"블로그 초안 생성 실패({slot}) — dotory_blog_draft.py 자체가 실패함")
@@ -439,7 +428,6 @@ def run(slot: str, dry_run: bool = False, publish_only: bool = False) -> bool:
                     pass
         except Exception as e:
             print(f"[main] 블로그 단계 실패(건너뜀): {e}")
-            _mark_blog_failed(slot)
             try:
                 from notify import notify_failure
                 notify_failure(f"블로그 단계 예외로 중단({slot}): {e}")
