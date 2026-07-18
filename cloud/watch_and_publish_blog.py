@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from pipeline_lock import pipeline_lock  # noqa: E402
-from cloud.run_blog_local import _run, REPO, GH  # noqa: E402
+from cloud.run_blog_local import _run, REPO, GH, _NO_WINDOW  # noqa: E402
 from notify import notify_failure  # noqa: E402
 
 STATE_PATH = ROOT / "cloud" / ".blog_watch_state.json"
@@ -125,7 +125,7 @@ def _process_runs(state: dict) -> None:
             subprocess.run(
                 [sys.executable, "-X", "utf8", "cloud/run_blog_local.py",
                  "--slot", slot, "--run-id", str(run_id)],
-                cwd=ROOT, check=True,
+                cwd=ROOT, check=True, creationflags=_NO_WINDOW,
             )
             print(f"[watch_blog] run {run_id} ({slot}) — 블로그 발행 완료")
         except subprocess.CalledProcessError as e:

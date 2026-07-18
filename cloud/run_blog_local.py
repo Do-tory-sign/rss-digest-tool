@@ -28,10 +28,15 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 REPO = "Do-tory-sign/rss-digest-tool"
 GH = r"C:\Program Files\GitHub CLI\gh.exe"
+# 2026-07-19: 작업 스케줄러(DotoryBlogWatcher)가 3분마다 이 스크립트를 거쳐 서브프로세스를
+# 여러 번 띄우는데, CREATE_NO_WINDOW 없이는 각 서브프로세스마다 검은 콘솔 창이 잠깐씩
+# 떴다 사라짐(작업 자체를 숨김 처리해도 자식 프로세스는 별도로 새 콘솔을 얻을 수 있음).
+_NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 
 def _run(args: list) -> str:
-    result = subprocess.run(args, capture_output=True, text=True, encoding="utf-8")
+    result = subprocess.run(args, capture_output=True, text=True, encoding="utf-8",
+                             creationflags=_NO_WINDOW)
     if result.returncode != 0:
         print(result.stdout)
         print(result.stderr)
@@ -84,7 +89,7 @@ def main():
     blog_dir = ROOT / "blog"
     draft_result = subprocess.run(
         [sys.executable, "-X", "utf8", "dotory_blog_draft.py", "--slot", slot],
-        cwd=blog_dir, capture_output=True, text=True,
+        cwd=blog_dir, capture_output=True, text=True, creationflags=_NO_WINDOW,
     )
     draft_path = None
     for line in draft_result.stdout.splitlines():
@@ -97,7 +102,7 @@ def main():
 
     subprocess.run(
         [sys.executable, "-X", "utf8", "dotory_blog_publish.py", "--draft", draft_path, "--publish"],
-        cwd=blog_dir,
+        cwd=blog_dir, creationflags=_NO_WINDOW,
     )
 
 
