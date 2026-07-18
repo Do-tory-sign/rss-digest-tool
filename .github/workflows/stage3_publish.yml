@@ -17,6 +17,13 @@ env:
 jobs:
   publish:
     runs-on: windows-latest
+    outputs:
+      slot: ${{ steps.slot.outputs.slot }}
+      # 2026-07-18: 네이버 로그인이 그 순간만 일시적으로 튕기는 경우가 있었는데(같은 쿠키가
+      # 몇 시간 뒤 다른 러너/IP에서는 그냥 통과됨) — 사이트+인스타는 이미 성공한 뒤라 잡
+      # 전체를 실패로 만들 수 없어서(재시도 시 인스타 중복 게시 위험), 블로그 실패만 별도
+      # 표시로 뽑아내 아래 retry-blog-publish 잡에서 블로그만 독립적으로 재시도한다.
+      blog_failed: ${{ steps.blogcheck.outputs.blog_failed }}
     env:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -111,6 +118,15 @@ jobs:
         run: |
           python -X utf8 main.py --slot ${{ steps.slot.outputs.slot }} --publish-only
 
+      - name: 블로그 발행 실패 여부 확인 (main.py가 실패 시 남기는 마커 파일)
+        id: blogcheck
+        if: always()
+        shell: pwsh
+        run: |
+          $failed = Test-Path "cloud/.blog_publish_failed"
+          echo "blog_failed=$failed" >> $env:GITHUB_OUTPUT
+          if ($failed) { Write-Host "[blogcheck] 블로그 발행 실패 감지 — 재시도 잡이 이어서 처리함" }
+
       - name: 네이버 쿠키 자동 갱신 (다음 실행을 위해 방금 쓴 세션을 다시 저장)
         shell: pwsh
         run: |
@@ -133,3 +149,50 @@ jobs:
         run: |
           Remove-Item -Force -ErrorAction SilentlyContinue instagram_graph_token.json
           Remove-Item -Force -ErrorAction SilentlyContinue firebase_service_account.json
+
+  # 2026-07-18: 네이버 로그인이 그 순간에만 일시적으로 튕기는 사고가 있었음(같은 쿠키가
+  # 몇 시간 뒤 새 러너/IP에서는 그냥 통과됨 — 진짜 만료가 아니라 네이버 이상탐지 또는
+  # 클라우드 러너 순간 이슈로 추정) — 사람이 매번 알아채고 로컬에서 수동 재발행할 필요
+  # 없게, 새 러너(=다른 IP)에서 블로그만 자동으로 한 번 재시도한다. 사이트/인스타는 위
+  # publish 잡에서 이미 성공했으므로 여기서는 절대 다시 안 건드림(인스타 중복 게시 방지).
+  retry-blog-publish:
+    needs: publish
+    if: needs.publish.outputs.blog_failed == 'true'
+    runs-on: windows-latest
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      BRAND_NAME: ${{ secrets.BRAND_NAME }}
+      NAVER_COOKIES_JSON: ${{ secrets.NAVER_COOKIES_JSON }}
+      NAVER_BLOG_ID: ${{ secrets.NAVER_BLOG_ID }}
+      GH_PAT_FOR_SECRETS: ${{ secrets.GH_PAT_FOR_SECRETS }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 의존성 설치
+        run: pip install -r requirements.txt
+
+      - name: 3분 대기 (다른 러너/IP로 재시도 — 직전 실패는 일시적 튕김이었을 가능성이 높음)
+        shell: pwsh
+        run: Start-Sleep -Seconds 180
+
+      - name: 네이버 로그인 복원 (쿠키 주입)
+        shell: pwsh
+        run: python -X utf8 cloud/naver_cookie_login.py
+        continue-on-error: true
+
+      - name: 블로그만 재발행 (run_blog_local.py — publish 잡의 승인된 카드 아티팩트 재사용)
+        shell: pwsh
+        run: python -X utf8 cloud/run_blog_local.py --slot ${{ needs.publish.outputs.slot }}
+
+      - name: 네이버 쿠키 자동 갱신
+        shell: pwsh
+        run: python -X utf8 cloud/refresh_naver_cookies.py
+        continue-on-error: true
