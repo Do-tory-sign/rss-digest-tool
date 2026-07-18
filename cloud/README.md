@@ -64,5 +64,7 @@ GitHub API(`repository_dispatch`)를 직접 호출해서 "다음 워크플로우
 - `cloud/dispatch_receiver.py` — repository_dispatch 페이로드를 받아서 어떤 동작을 할지 판단하는 헬퍼(워크플로우 안에서 사용)
 - `cloud/telegram_webhook_worker.js` — Cloudflare Worker (텔레그램 웹훅 수신 → GitHub repository_dispatch 호출). Actions 밖에서 별도 배포 필요(무료 티어).
 - `cloud/set_telegram_webhook.py` — 로컬에서 1회 실행, 텔레그램 봇의 webhook URL을 Worker 주소로 등록
-- `cloud/extract_naver_cookies.py` — (2단계) 로컬 Chrome에서 네이버 로그인 쿠키 추출 → GitHub Secret 등록용 JSON 출력
-- `cloud/naver_cookie_login.py` — (2단계) Actions 안에서 쿠키를 주입해 로그인 상태 복원(Playwright)
+- `cloud/run_blog_local.py` — 2026-07-19: 네이버 블로그 자동 발행은 이용약관 위반 소지 + 클라우드
+  러너 IP/기기 지문 이상탐지 리스크 때문에 클라우드에서 완전히 뺌(`SKIP_BLOG=1`). 사이트+인스타는
+  계속 클라우드에서 처리되고, 이 스크립트가 로컬 PC에서 승인된 카드 아티팩트를 받아와 블로그만
+  마저 발행함 (사용자 본인 로그인 세션 사용).
