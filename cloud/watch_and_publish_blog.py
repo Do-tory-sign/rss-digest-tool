@@ -29,8 +29,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+# 2026-07-19: Task Scheduler의 Hidden 옵션 + CREATE_NO_WINDOW로도 콘솔 창이 완전히 안 잡혀서
+# pythonw.exe(콘솔 서브시스템 자체가 없는 버전)로 등록을 바꿈. 그런데 pythonw.exe는 아무 데도
+# 리다이렉트 안 된 상태에서 sys.stdout/stderr가 None이라 print()가 그대로 죽는다 — 파일로
+# 리다이렉트해서 로그도 남기고 크래시도 막는다.
+if sys.stdout is None or sys.stderr is None:
+    _log = open(ROOT / "cloud" / ".blog_watch.log", "a", encoding="utf-8", buffering=1)
+    sys.stdout = _log
+    sys.stderr = _log
+
 from pipeline_lock import pipeline_lock  # noqa: E402
-from cloud.run_blog_local import _run, REPO, GH, _NO_WINDOW  # noqa: E402
+from cloud.run_blog_local import _run, REPO, GH, _NO_WINDOW, _PYTHON_EXE  # noqa: E402
 from notify import notify_failure  # noqa: E402
 
 STATE_PATH = ROOT / "cloud" / ".blog_watch_state.json"
@@ -123,7 +132,7 @@ def _process_runs(state: dict) -> None:
             # 다시 조회하면, 이 사이 다른 슬롯의 run이 먼저 성공해있을 때 엉뚱한 run에서
             # approved-cards-<slot>을 찾다 실패/불일치할 수 있음(2026-07-19 코드 리뷰에서 발견).
             subprocess.run(
-                [sys.executable, "-X", "utf8", "cloud/run_blog_local.py",
+                [_PYTHON_EXE, "-X", "utf8", "cloud/run_blog_local.py",
                  "--slot", slot, "--run-id", str(run_id)],
                 cwd=ROOT, check=True, creationflags=_NO_WINDOW,
             )

@@ -32,6 +32,10 @@ GH = r"C:\Program Files\GitHub CLI\gh.exe"
 # 여러 번 띄우는데, CREATE_NO_WINDOW 없이는 각 서브프로세스마다 검은 콘솔 창이 잠깐씩
 # 떴다 사라짐(작업 자체를 숨김 처리해도 자식 프로세스는 별도로 새 콘솔을 얻을 수 있음).
 _NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+# pythonw.exe(콘솔 없는 버전)로 실행 중이어도 자식 프로세스는 sys.executable(=pythonw.exe)을
+# 그대로 물려받으면 자식의 print()가 sys.stdout=None으로 죽는다 — 항상 콘솔판 python.exe로
+# 띄우고(콘솔 자체는 CREATE_NO_WINDOW로 숨김) stdout을 안전하게 유지한다.
+_PYTHON_EXE = str(Path(sys.executable).with_name("python.exe"))
 
 
 def _run(args: list) -> str:
@@ -88,7 +92,7 @@ def main():
     print(f"[run_blog_local] [{slot}] 블로그 초안 작성 중...")
     blog_dir = ROOT / "blog"
     draft_result = subprocess.run(
-        [sys.executable, "-X", "utf8", "dotory_blog_draft.py", "--slot", slot],
+        [_PYTHON_EXE, "-X", "utf8", "dotory_blog_draft.py", "--slot", slot],
         cwd=blog_dir, capture_output=True, text=True, creationflags=_NO_WINDOW,
     )
     draft_path = None
@@ -101,7 +105,7 @@ def main():
         raise RuntimeError("블로그 초안 생성 실패")
 
     subprocess.run(
-        [sys.executable, "-X", "utf8", "dotory_blog_publish.py", "--draft", draft_path, "--publish"],
+        [_PYTHON_EXE, "-X", "utf8", "dotory_blog_publish.py", "--draft", draft_path, "--publish"],
         cwd=blog_dir, creationflags=_NO_WINDOW,
     )
 
