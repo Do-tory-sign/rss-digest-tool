@@ -29,7 +29,7 @@ STYLE_BASE = f"""스타일 규칙 (반드시 지킬 것):
 - 색상 팔레트: 크림(#FBF8F2), 호박색(#D97706), 갈색(#7C4A1E), 베이지 계열로 통일
 - 장면을 풍부하게: 주제 오브제 + 배경 환경 + 보조 디테일까지 화면을 꽉 채운 완성된 장면
   (오브제 하나만 덩그러니 있는 아이콘식 구성 금지)
-- 가로 와이드 구도. 장면이 이미지 네 변(상하좌우) 모두에 닿아야 함 —
+- 정사각(1:1) 구도. 장면이 이미지 네 변(상하좌우) 모두에 닿아야 함 —
   테두리(흰색·검은색·다른 색 모두 포함), 액자식 여백, 카드 형태 구성 절대 금지.
   풀블리드(full-bleed)로 네 변 끝까지 꽉 채울 것 — 어떤 색의 띠/프레임도 가장자리에 남기지 말 것
 - 알록달록한 색, 웹툰체, 과장된 표정, 개그 연출 금지
@@ -250,7 +250,7 @@ def _remove_tail_inpaint(image_bytes: bytes) -> bytes | None:
                 "이어지도록 자연스럽게 채우세요 (다리/발은 그대로 유지). 나머지 구도·배경·다른 요소는 "
                 "전부 그대로 유지하세요.",
             ],
-            config=types.GenerateContentConfig(image_config=types.ImageConfig(aspect_ratio="16:9")),
+            config=types.GenerateContentConfig(image_config=types.ImageConfig(aspect_ratio="1:1")),
         )
         for part in resp.candidates[0].content.parts:
             if part.inline_data and len(part.inline_data.data) >= MIN_IMAGE_BYTES:
@@ -273,7 +273,7 @@ def _remove_text_inpaint(image_bytes: bytes) -> bytes | None:
                 "같은 배경 톤·질감으로 자연스럽게 채우고, 나머지 구도·인물·색감·조명은 전부 "
                 "그대로 유지하세요. 어떤 문자도 남기지 마세요.",
             ],
-            config=types.GenerateContentConfig(image_config=types.ImageConfig(aspect_ratio="16:9")),
+            config=types.GenerateContentConfig(image_config=types.ImageConfig(aspect_ratio="1:1")),
         )
         for part in resp.candidates[0].content.parts:
             if part.inline_data and len(part.inline_data.data) >= MIN_IMAGE_BYTES:
@@ -283,8 +283,11 @@ def _remove_text_inpaint(image_bytes: bytes) -> bytes | None:
     return None
 
 
-def _trim_and_widen(image_bytes: bytes, ratio: float = 16 / 9) -> bytes:
-    """배경 여백 자동 크롭 후 중앙 기준 16:9로 잘라내기"""
+def _trim_and_square(image_bytes: bytes, ratio: float = 1.0) -> bytes:
+    """배경 여백 자동 크롭 후 중앙 기준으로 카드 이미지 슬롯 비율(1:1, cover_explain.html의
+    body 전체 배경)에 맞춰 잘라내기. 2026-07-19: 예전엔 16:9로 넓게 생성한 뒤 카드 템플릿이
+    그걸 다시 정사각으로 크롭했는데, 실제로 발행되는 카드가 전부 1080x1080 정사각(표지는
+    풀블리드, image/templates/cover_explain.html)이라 애초에 생성 단계부터 1:1로 맞춤."""
     import io
     from PIL import Image, ImageChops
 
@@ -302,13 +305,13 @@ def _trim_and_widen(image_bytes: bytes, ratio: float = 16 / 9) -> bytes:
         bottom = min(bbox[3] + pad, im.height)
         im = im.crop((left, top, right, bottom))
 
-    # 2) 중앙 기준 16:9 크롭 (세로가 길면 위아래 자르고, 가로가 너무 길면 좌우 자름)
+    # 2) 중앙 기준 목표 비율 크롭 (세로가 길면 위아래 자르고, 가로가 너무 길면 좌우 자름)
     w, h = im.size
-    if w / h < ratio:       # 너무 정사각/세로형 → 위아래 자르기
+    if w / h < ratio:       # 목표보다 세로로 김 → 위아래 자르기
         new_h = int(w / ratio)
         top = (h - new_h) // 2
         im = im.crop((0, top, w, top + new_h))
-    elif w / h > ratio * 1.3:  # 지나치게 길면 좌우만 살짝
+    elif w / h > ratio * 1.3:  # 지나치게 가로로 김 → 좌우만 살짝
         new_w = int(h * ratio)
         left = (w - new_w) // 2
         im = im.crop((left, 0, left + new_w, h))
@@ -384,7 +387,7 @@ def _generate(prompt: str, out_path: Path, use_character: bool, retries: int = 3
     contents.append(prompt)
 
     config = types.GenerateContentConfig(
-        image_config=types.ImageConfig(aspect_ratio="16:9"),
+        image_config=types.ImageConfig(aspect_ratio="1:1"),
     )
 
     MAX_OVERLOAD_RETRIES = 5  # 503/429 같은 일시적 과부하는 콘텐츠 재시도 횟수를 깎지 않고 따로 버팀
@@ -449,7 +452,7 @@ def _generate(prompt: str, out_path: Path, use_character: bool, retries: int = 3
             continue
 
         try:
-            image_data = _trim_and_widen(image_data)
+            image_data = _trim_and_square(image_data)
         except Exception as e:
             print(f"[article_image] 크롭 실패(원본 사용): {e}")
         out_path.parent.mkdir(parents=True, exist_ok=True)
