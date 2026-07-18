@@ -2,7 +2,7 @@
 자동으로 마저 발행하는 감시 스크립트.
 
 시각 기준(예: "매일 21시") 대신, "클라우드가 방금 사이트+인스타 발행을 끝냈는가"를
-기준으로 트리거하고 싶어서 만듦 — Windows 작업 스케줄러에 몇 분 간격(예: 3분)
+기준으로 트리거하고 싶어서 만듦 — Windows 작업 스케줄러에 몇 분 간격(예: 10분)
 반복 실행으로 등록해두면, 승인 직후 클라우드가 끝나는 대로 몇 분 안에 자동으로
 run_blog_local.py가 뒤따라 실행된다.
 
@@ -45,7 +45,7 @@ from notify import notify_failure  # noqa: E402
 STATE_PATH = ROOT / "cloud" / ".blog_watch_state.json"
 # main.py/v2_main.py의 .pipeline.lock과는 무관한 별개 락 — 저 둘은 로컬 카드 생성 파이프라인이고
 # 이 스크립트는 클라우드 산출물을 받아 블로그만 발행하므로 같은 락을 공유하면 서로 불필요하게
-# 막힘. 이 스크립트끼리(3분 간격 폴링이 이전 실행과 겹치는 경우)만 막으면 됨.
+# 막힘. 이 스크립트끼리(10분 간격 폴링이 이전 실행과 겹치는 경우)만 막으면 됨.
 WATCH_LOCK_PATH = ROOT / "cloud" / ".blog_watch.lock"
 ARTIFACT_RE = re.compile(r"^approved-cards-(morning|lunch|evening|night)$")
 
@@ -152,7 +152,7 @@ def _process_runs(state: dict) -> None:
 
 def main():
     state = _load_state()
-    # 3분 간격 폴링 중 이전 실행(느린 Selenium 네이버 발행 등)이 아직 안 끝났으면 이번 폴링은
+    # 10분 간격 폴링 중 이전 실행(느린 Selenium 네이버 발행 등)이 아직 안 끝났으면 이번 폴링은
     # 건너뜀 — main.py의 pipeline_lock과 동일한 메커니즘, 단 이 스크립트 전용 락 파일 사용.
     with pipeline_lock("watch_and_publish_blog.py", wait_seconds=5, lock_path=WATCH_LOCK_PATH) as got_lock:
         if not got_lock:
