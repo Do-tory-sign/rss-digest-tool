@@ -216,6 +216,50 @@ def _has_text(image_bytes: bytes) -> bool:
         return False
 
 
+def _has_tail(image_bytes: bytes) -> bool:
+    """도토리 캐릭터 몸통 아래쪽(다리 사이 포함)에 꼬리/돌기가 그려졌는지 Gemini 비전으로 검사.
+    2026-07-18: 프롬프트에 이미 강한 금지 규칙이 있고 사용자 피드백까지 반영해도 이 디테일만은
+    텍스트 지시로 안정적으로 통제가 안 돼서(이미지 생성 모델의 습관성 아티팩트로 추정),
+    전체 재생성 대신 국소 인페인팅으로 잡는 전용 검사를 추가함. 판단 불가 시 통과(False)."""
+    try:
+        resp = client.models.generate_content(
+            model=CLASSIFY_MODELS[0],
+            contents=[
+                types.Part.from_bytes(data=image_bytes, mime_type="image/png"),
+                "이 이미지 속 도토리(캐릭터) 몸통 아래쪽을 자세히 보세요. 다리 사이나 몸통 바닥에서 "
+                "아래로 튀어나오거나 돌출된 작은 돌기·뿔·꼭지·꼬리 모양이 있나요? "
+                "(정상은 다리/발을 제외하면 몸통 바닥이 매끈하고 둥근 곡면이어야 함) "
+                "그런 돌출부가 있으면 'yes', 없거나 도토리 캐릭터가 아예 없으면 'no' 한 단어만 답하세요.",
+            ],
+        )
+        return "yes" in resp.text.strip().lower()
+    except Exception:
+        return False
+
+
+def _remove_tail_inpaint(image_bytes: bytes) -> bytes | None:
+    """도토리 몸통 아래쪽 돌기/꼬리만 국소 편집으로 지운다. 텍스트 인페인팅(_remove_text_inpaint)과
+    동일하게, 전체 재생성보다 구도·인물·색감 유지율이 훨씬 높아서 감지 시 1순위로 시도."""
+    try:
+        resp = client.models.generate_content(
+            model=IMAGE_MODEL,
+            contents=[
+                types.Part.from_bytes(data=image_bytes, mime_type="image/png"),
+                "이 이미지 속 도토리 캐릭터의 몸통 아래쪽(다리 사이 포함)에 튀어나온 작은 돌기·뿔·꼭지·"
+                "꼬리 모양이 있다면 지워주세요. 그 자리는 몸통과 같은 색·질감으로 매끈하고 둥글게 "
+                "이어지도록 자연스럽게 채우세요 (다리/발은 그대로 유지). 나머지 구도·배경·다른 요소는 "
+                "전부 그대로 유지하세요.",
+            ],
+            config=types.GenerateContentConfig(image_config=types.ImageConfig(aspect_ratio="16:9")),
+        )
+        for part in resp.candidates[0].content.parts:
+            if part.inline_data and len(part.inline_data.data) >= MIN_IMAGE_BYTES:
+                return part.inline_data.data
+    except Exception as e:
+        print(f"[article_image] 돌기 인페인팅 편집 실패: {e}")
+    return None
+
+
 def _remove_text_inpaint(image_bytes: bytes) -> bytes | None:
     """이미지에 글자가 감지됐을 때, 전체를 다시 그리지 않고 글자만 지우는 부분 편집 시도.
     2026-06-28 테스트(4/4 성공) 결과 전체 재생성보다 구도·인물·색감 유지율이 훨씬 높아서
@@ -385,6 +429,17 @@ def _generate(prompt: str, out_path: Path, use_character: bool, retries: int = 3
                 image_data = edited
             else:
                 print(f"[article_image] 인페인팅 실패/글자 남음 → 전체 재생성 (시도 {attempt+1}, no-text 강조)")
+                time.sleep(1)
+                continue
+
+        if use_character and _has_tail(image_data):
+            print("[article_image] 도토리 몸통 돌기/꼬리 감지 — 국소 인페인팅 먼저 시도")
+            edited = _remove_tail_inpaint(image_data)
+            if edited is not None and not _has_tail(edited):
+                print("[article_image] 인페인팅으로 돌기 제거 성공 — 구도 유지한 채 저장")
+                image_data = edited
+            else:
+                print(f"[article_image] 돌기 인페인팅 실패/여전히 감지 → 전체 재생성 (시도 {attempt+1})")
                 time.sleep(1)
                 continue
 
