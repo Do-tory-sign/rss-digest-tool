@@ -70,6 +70,12 @@ def main():
         run_id = runs[0]["databaseId"]
 
     dest = ROOT / "cloud" / "_artifact_tmp"
+    # 2026-07-19: 이전 실행이 받아둔 파일이 안 지워진 채로 남아있으면 "gh run download"가
+    # "파일이 이미 있음"으로 그냥 실패함(예: 아침에 받은 build_done_lunch.txt가 남아있는 채로
+    # 점심 걸 받으려다 실패) — 매번 완전히 비운 상태에서 새로 받는다.
+    import shutil
+    if dest.exists():
+        shutil.rmtree(dest)
     dest.mkdir(parents=True, exist_ok=True)
     print(f"[run_blog_local] run {run_id} 아티팩트 다운로드 중 (approved-cards-{slot})...")
     _run([GH, "run", "download", str(run_id), "-R", REPO,
@@ -118,10 +124,22 @@ def main():
     # check=True 필수: 이게 빠져있으면 dotory_blog_publish.py가 실패 종료(exit 1)해도 이
     # subprocess.run은 그냥 넘어가고 run_blog_local.py 자체는 exit 0으로 끝나버림 —
     # watch_and_publish_blog.py가 이걸 "성공"으로 착각해서 재시도를 아예 안 걺.
-    subprocess.run(
-        [_PYTHON_EXE, "-X", "utf8", "dotory_blog_publish.py", "--draft", draft_path, "--publish"],
-        cwd=blog_dir, creationflags=_NO_WINDOW, check=True,
-    )
+    # capture_output 필수: CREATE_NO_WINDOW로 띄운 자식 프로세스는 부모에 콘솔이 없으면
+    # print() 출력이 아무 데도 안 남고 사라짐 — 실패해도 "exit status 1"만 남고 진짜 원인
+    # (크롬 꺼짐/로그인 만료/DOM 못 찾음 등)이 안 보이는 사고가 있었음(2026-07-19).
+    # timeout: 한 번 Selenium이 30분 넘게 멈춰서 그동안 감시 스크립트 락을 붙들고 있었던
+    # 사고가 있어서, 6분 넘으면 멈춘 것으로 보고 포기(재시도는 다음 폴링에서).
+    try:
+        publish_result = subprocess.run(
+            [_PYTHON_EXE, "-X", "utf8", "dotory_blog_publish.py", "--draft", draft_path, "--publish"],
+            cwd=blog_dir, creationflags=_NO_WINDOW, check=True,
+            capture_output=True, text=True, timeout=360,
+        )
+        print(publish_result.stdout)
+    except subprocess.CalledProcessError as e:
+        print(e.stdout)
+        print(e.stderr)
+        raise
 
 
 if __name__ == "__main__":

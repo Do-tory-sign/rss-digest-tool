@@ -131,14 +131,39 @@ def _process_runs(state: dict) -> None:
             # run_id를 명시적으로 넘긴다 — run_blog_local.py가 자체적으로 "가장 최근 성공 run"을
             # 다시 조회하면, 이 사이 다른 슬롯의 run이 먼저 성공해있을 때 엉뚱한 run에서
             # approved-cards-<slot>을 찾다 실패/불일치할 수 있음(2026-07-19 코드 리뷰에서 발견).
-            subprocess.run(
+            # 2026-07-19: capture_output이 없으면 CREATE_NO_WINDOW로 띄운 자식 프로세스의
+            # print() 출력이 아무 데도 안 남고 그냥 사라져서, 실패해도 "exit status 1"이라는
+            # 의미 없는 메시지만 남았음(실제 원인 불명) — 반드시 캡처해서 로그/알림에 포함한다.
+            # timeout도 추가: 예전에 한 번 프로세스가 30분 넘게 멈춰서 그동안 락을 붙들고
+            # 있느라 이후 폴링이 전부 건너뛰어진 사고가 있었음 — 8분 넘으면 실패로 간주.
+            result = subprocess.run(
                 [_PYTHON_EXE, "-X", "utf8", "cloud/run_blog_local.py",
                  "--slot", slot, "--run-id", str(run_id)],
                 cwd=ROOT, check=True, creationflags=_NO_WINDOW,
+                capture_output=True, text=True, timeout=480,
             )
+            print(result.stdout)
             print(f"[watch_blog] run {run_id} ({slot}) — 블로그 발행 완료")
+        except subprocess.TimeoutExpired as e:
+            # 2026-07-19: 타임아웃은 "명확한 실패"(예: 아티팩트 못 찾음)와 달리 애매함 —
+            # 실제로는 네이버 발행 자체는 성공했는데 그 *직후*(크롬 종료 등)에서 멈춘 경우도
+            # 있었음(이번에 실제로 겪음: 발행 성공 알림까지 갔는데 프로세스가 30분 넘게
+            # 안 끝나서 재시도됐고, 결국 같은 글이 중복 발행됨). 타임아웃일 땐 자동 재시도
+            # 대신 사람이 직접 확인하게 하고(processed로 표시해 재시도 안 함), 중복 발행보다
+            # "가끔 한 번 놓쳐서 사람이 알아채는 게" 훨씬 안전하다.
+            tail = ((e.stdout or "") + "\n" + (e.stderr or ""))[-800:]
+            msg = (f"⚠️ [{slot}] 블로그 로컬 발행이 8분 넘게 응답 없음(run {run_id}) — "
+                   "이미 발행됐을 수도 있어요(중복 방지를 위해 자동 재시도 안 함). "
+                   f"블로그에서 직접 확인해주세요.\n{tail}")
+            print(f"[watch_blog] {msg}")
+            _alert_once(state, run_id, msg)
+            processed.add(run_id)
+            state["processed_run_ids"] = sorted(processed)
+            _save_state(state)
+            continue
         except subprocess.CalledProcessError as e:
-            msg = f"⚠️ [{slot}] 블로그 로컬 발행 실패(run {run_id}): {e}"
+            tail = ((e.stdout or "") + "\n" + (e.stderr or ""))[-800:]
+            msg = f"⚠️ [{slot}] 블로그 로컬 발행 실패(run {run_id})\n{tail}"
             print(f"[watch_blog] {msg}")
             print("[watch_blog] 다음 폴링에서 재시도됨(이번 run은 처리 완료로 표시하지 않음)")
             _alert_once(state, run_id, msg)
