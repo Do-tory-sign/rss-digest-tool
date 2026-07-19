@@ -81,7 +81,16 @@ CDN_PROPAGATION_RETRY_WAITS = [20, 40, 60]  # 2026-07-05: Firebase 배포 직후
 
 def _is_media_fetch_transient_error(res: dict) -> bool:
     err = res.get("error", {})
-    return err.get("code") == 9004 and err.get("error_subcode") == 2207052
+    if err.get("code") == 9004 and err.get("error_subcode") == 2207052:
+        return True
+    # 2026-07-19: code 1 "An unknown error occurred"은 메타 Graph API가 순간적인 서버 쪽
+    # 문제일 때 흔히 던지는 값 없는 제네릭 오류(구체적 원인 코드가 아예 없음) — 실제로
+    # evening 슬롯에서 이 오류로 실패했다가, 잠시 후 사람이 수동 재시도하니 바로 성공함
+    # (파일/설정 문제였다면 재시도해도 똑같이 실패했을 것). CDN 전파 지연과 같은 재시도
+    # 전략을 그대로 적용한다.
+    if err.get("code") == 1 and not err.get("error_subcode"):
+        return True
+    return False
 
 
 def _create_item_container(ig_user_id: str, token: str, image_url: str) -> str | None:
