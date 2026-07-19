@@ -1298,10 +1298,18 @@ return false;
         # 바로 구분할 수 있게 각 단계 결과를 로그로 남긴다(추측 대신 증거로 다음 조치 결정).
         preview = (text or "")[:20]
         try:
-            self.driver.execute_script(js, text, color)
+            exec_ok = self.driver.execute_script(js, text, color)
         except Exception as e:
             self._log(f"[naver] HTML 굵게 삽입 실패(exec 자체 예외, '{preview}'): {e}")
             return False
+        if not exec_ok:
+            # 2026-07-19: execCommand('insertHTML', ...)의 반환값을 여태 안 찍고 있었음 —
+            # 검증 실패 로그만으로는 "삽입 명령 자체가 false를 반환했다"와 "삽입은 됐는데
+            # DOM에서 못 찾았다"를 구분할 수 없었음. 이번에 소제목 4개가 전부 검증 실패했는데
+            # (예전엔 간헐적) 이 값을 봐야 Chrome이 execCommand 자체를 거부하기 시작한 건지
+            # 판단 가능.
+            self._log(f"[naver] HTML 굵게 삽입: execCommand가 false 반환('{preview}') — "
+                       "브라우저가 삽입 자체를 거부한 것으로 보임")
         # 커서를 <b> 밖으로 — 네이티브 End 키(실제 브라우저 키 이벤트)만 사용, JS로
         # Selection/Range를 직접 건드리지 않는다 (스마트에디터 내부 커서 상태와 어긋나서
         # 이후 Enter가 새 문단을 못 만드는 심각한 레이스가 있었음, 2026-07-02).
