@@ -1265,7 +1265,8 @@ const text = arguments[0];
 const color = arguments[1];
 const esc = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const styleAttr = color ? (' style="color:' + color + '"') : '';
-return document.execCommand('insertHTML', false, '<b' + styleAttr + '>' + esc + '</b>');
+return document.execCommand('insertHTML', false,
+    '<b data-dotory-bold="1"' + styleAttr + '>' + esc + '</b>');
 """
         verify_js = """
 const text = arguments[0];
@@ -1287,7 +1288,7 @@ const doc = frame ? frame.contentDocument : document;
 const spans = doc.querySelectorAll('span.__se-node, p span');
 for (const el of spans) {
   if (el.textContent && el.textContent.trim() === text.trim() && !el.querySelector('b') && el.closest('b') === null) {
-    el.innerHTML = '<b>' + el.innerHTML + '</b>';
+    el.innerHTML = '<b data-dotory-bold="1">' + el.innerHTML + '</b>';
     return true;
   }
 }
@@ -1341,13 +1342,17 @@ return false;
             return False
 
     def _strip_stray_bold(self) -> None:
-        """저장/발행 직전 최종 안전망: "|"로 시작하는 소제목만 굵게, 나머지는 전부
-        기본 글씨가 되도록 양방향으로 강제 정리한다(2026-07-02).
-        - 소제목이 아닌데 굵게 새어 들어간 것 → 벗김(그동안 여러 번 재발한 문제)
-        - 소제목인데 insertHTML이 씹혀서 안 굵게 들어간 것 → 굵게 강제 적용
+        """저장/발행 직전 최종 안전망: 의도적으로 굵은 곳(1. "|"로 시작하는 소제목,
+        2. data-dotory-bold 마커가 붙은 곳 — {{point:...}} 등 "|" 없이 굵게 넣는 텍스트)만
+        굵게 남기고, 나머지는 전부 기본 글씨가 되도록 양방향으로 강제 정리한다(2026-07-02,
+        2026-07-19 point 스타일 대응 추가).
+        - 의도한 곳이 아닌데 굵게 새어 들어간 것 → 벗김(그동안 여러 번 재발한 문제)
+        - "|" 소제목인데 insertHTML이 씹혀서 안 굵게 들어간 것 → 굵게 강제 적용
           (특히 마지막 소제목 "| 앞으로는?"이 몇 차례 테스트에서 계속 안 굵게 남는
           현상이 있었음 — insertHTML 단계의 검증/재시도만으로는 못 잡아서 저장 직전
-          문단 단위 최종 스윕으로 한 번 더 확정 처리)."""
+          문단 단위 최종 스윕으로 한 번 더 확정 처리).
+        - 위 두 패스로도 안 잡히는 굵기 유출이 있으면(다른 메커니즘으로 새는 경우) 값은
+          안 건드리고 로그만 남겨서 다음 재발 시 바로 원인을 좁힐 수 있게 한다."""
         js = """
 const frame = document.querySelector('iframe.se-iframe, iframe[name="mainFrame"]');
 const doc = frame ? frame.contentDocument : document;
@@ -1357,7 +1362,7 @@ let unbolded = 0, bolded = 0;
 // <strong>이나 인라인 style="font-weight"로 들어간 경우를 놓쳐서 본문이 통째로
 // 굵게 남는 사고가 있었음(소제목은 안 굵고 본문만 굵은, 완전히 뒤바뀐 형태로 발행됨)
 // — <b>/<strong>/굵은 인라인 스타일을 모두 검사 대상에 포함한다.
-const BOLD_SEL = 'b, strong, [style*="font-weight"]';
+const BOLD_SEL = 'b, strong, a, [style*="font-weight"]';
 // 2026-07-17: [style*="font-weight"]는 값 상관없이 속성 존재만 보는 부분 문자열 매칭이라
 // font-weight:normal(의도적으로 굵기를 상쇄하는 인라인 스타일)까지 "굵음"으로 오판해서
 // unbold 처리(=값을 비움) 대상에 넣고 있었음 — 실제로 안 굵던 곳까지 사이드이펙트로
@@ -1369,6 +1374,12 @@ const isActuallyBold = (el) => {
 };
 const boldEls = Array.from(doc.querySelectorAll(BOLD_SEL)).filter(isActuallyBold);
 for (const b of boldEls) {
+  // 2026-07-19: "|"로 시작하는 문단만 정상 굵기로 인정했더니, {{point:...}}(예: "원문 보기",
+  // 시각차 요약)처럼 "|" 없이 의도적으로 굵게 넣는 텍스트까지 매번 스윕이 벗겨버리고
+  // 있었음 — _insert_bold_via_html/repair_js가 심어두는 data-dotory-bold 마커가 있으면
+  // (또는 조상에 있으면) "|" 여부와 무관하게 의도된 굵기로 인정한다.
+  if (b.hasAttribute && b.hasAttribute('data-dotory-bold')) continue;
+  if (b.closest && b.closest('[data-dotory-bold]')) continue;
   // 2026-07-14: <b> 자체의 텍스트만 보고 "|"로 시작하는지 검사했더니, 아래쪽
   // 소제목들은 "|" 글자가 <b> 밖의 별도 노드에 있는 구조라서 이 검사에 걸려
   // 정상 소제목까지 벗겨지는 버그가 있었음(위쪽 소제목만 살아남고 아래쪽은
@@ -1399,15 +1410,29 @@ for (const p of paras) {
   const spans = p.querySelectorAll('span.__se-node');
   for (const sp of spans) {
     if (!sp.textContent || !sp.textContent.trim()) continue;
-    sp.innerHTML = '<b>' + sp.innerHTML + '</b>';
+    sp.innerHTML = '<b data-dotory-bold="1">' + sp.innerHTML + '</b>';
     bolded++;
   }
 }
-return unbolded + '/' + bolded;
+// 3) 진단 전용: 위 두 패스가 다 끝난 뒤에도, "|"로 시작 안 하고 마커도 없는 문단인데
+// 실제 렌더링된 폰트굵기가 굵은 경우가 있으면 — BOLD_SEL이 못 잡는 방식(다른 클래스 등)
+// 으로 굵게 새는 사고로 추정. 값을 바꾸지 않고 로그만 남겨서 다음 재발 시 원인을 좁힌다.
+const leaks = [];
+for (const p of paras.length ? paras : doc.querySelectorAll('.se-text-paragraph')) {
+  const t = (p.textContent || '').trim();
+  if (!t || t.startsWith('|')) continue;
+  if (p.querySelector('[data-dotory-bold]')) continue;
+  const fw = getComputedStyle(p).fontWeight || '';
+  if (fw === 'bold' || parseInt(fw, 10) >= 600) leaks.push(t.slice(0, 20));
+}
+return unbolded + '/' + bolded + '/' + JSON.stringify(leaks);
 """
         try:
             result = self.driver.execute_script(js)
-            unbolded, bolded = (result or "0/0").split("/")
+            unbolded, bolded, leaks_json = (result or "0/0/[]").split("/", 2)
+            leaks = json.loads(leaks_json) if leaks_json else []
+            if leaks:
+                self._log(f"[naver] ⚠️ 스윕 후에도 굵게 남은 문단(원인 불명, 마커 없음): {leaks}")
             if int(unbolded) or int(bolded):
                 self._log(f"[naver] 소제목 굵게 최종 정리: 잘못 굵은 곳 {unbolded}곳 해제, 안 굵은 소제목 {bolded}곳 보정")
         except Exception:
