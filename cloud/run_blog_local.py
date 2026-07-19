@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import time
 import zipfile
 from pathlib import Path
 
@@ -104,9 +105,22 @@ def main():
         print(draft_result.stderr)
         raise RuntimeError("블로그 초안 생성 실패")
 
+    # 2026-07-19: 재부팅 등으로 디버그포트 크롬이 꺼져있으면 dotory_blog_publish.py가
+    # "크롬이 꺼져있어요"로 실패하고 사람이 login_chrome.py를 직접 실행해줘야 했음 — 로그인
+    # 세션 자체는 프로필에 저장돼있어서 재로그인 없이 그냥 다시 켜기만 하면 되므로, 발행 전에
+    # 미리 켜준다(이미 켜져있으면 login_chrome.py가 즉시 no-op으로 끝남).
+    subprocess.run(
+        [_PYTHON_EXE, "-X", "utf8", "naver_engine/login_chrome.py"],
+        cwd=blog_dir, creationflags=_NO_WINDOW,
+    )
+    time.sleep(5)  # 방금 새로 켰다면 디버그 포트가 열릴 때까지 잠깐 대기
+
+    # check=True 필수: 이게 빠져있으면 dotory_blog_publish.py가 실패 종료(exit 1)해도 이
+    # subprocess.run은 그냥 넘어가고 run_blog_local.py 자체는 exit 0으로 끝나버림 —
+    # watch_and_publish_blog.py가 이걸 "성공"으로 착각해서 재시도를 아예 안 걺.
     subprocess.run(
         [_PYTHON_EXE, "-X", "utf8", "dotory_blog_publish.py", "--draft", draft_path, "--publish"],
-        cwd=blog_dir, creationflags=_NO_WINDOW,
+        cwd=blog_dir, creationflags=_NO_WINDOW, check=True,
     )
 
 
