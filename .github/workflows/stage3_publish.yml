@@ -110,6 +110,11 @@ jobs:
           python -X utf8 main.py --slot ${{ steps.slot.outputs.slot }} --publish-only
 
       - name: 승인된 카드 이미지 업로드 (블로그는 로컬에서 처리 — 다운로드용)
+        # 2026-07-19: 인스타그램 업로드만 실패해도 main.py가 exit 1로 끝나서 이 스텝 자체가
+        # 스킵됐음 — 사이트 배포와 카드 데이터는 이미 정상인데 그걸 회수할 방법이 없어짐
+        # (인스타만 로컬에서 수동 재발행하려 해도 기사 데이터를 못 가져옴). 실패해도 항상
+        # 실행되게 함.
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: approved-cards-${{ steps.slot.outputs.slot }}
