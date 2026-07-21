@@ -50,10 +50,18 @@ WATCH_LOCK_PATH = ROOT / "cloud" / ".blog_watch.lock"
 ARTIFACT_RE = re.compile(r"^approved-cards-(morning|lunch|evening|night)$")
 
 
+# 2026-07-21: CalledProcessError는 "다음 폴링에서 재시도"하도록 무제한으로 뒀는데, 이게
+# 실제로 사고를 냈음 — 며칠 지난 죽은 run(다른 슬롯의 오래된 아티팩트, 절대 성공할 수 없는
+# 상태)이 매 폴링마다 계속 재시도되면서 폴링 한 번의 처리 시간이 계속 늘어났고, 그 와중에
+# "이번 폴링에서 방금 진짜로 성공한" run이 락 경합으로 여러 번 겹쳐 실행되어 같은 글이
+# 반복 발행되는 사고로 이어짐. run_id별 실패 횟수를 세어 일정 횟수 이상이면 영구 포기한다.
+MAX_ATTEMPTS = 3
+
+
 def _load_state() -> dict:
     if STATE_PATH.exists():
         return json.loads(STATE_PATH.read_text(encoding="utf-8"))
-    return {"processed_run_ids": [], "alerted_run_ids": []}
+    return {"processed_run_ids": [], "alerted_run_ids": [], "attempt_counts": {}}
 
 
 def _save_state(state: dict) -> None:
@@ -163,11 +171,23 @@ def _process_runs(state: dict) -> None:
             continue
         except subprocess.CalledProcessError as e:
             tail = ((e.stdout or "") + "\n" + (e.stderr or ""))[-800:]
-            msg = f"⚠️ [{slot}] 블로그 로컬 발행 실패(run {run_id})\n{tail}"
+            attempts = state.setdefault("attempt_counts", {})
+            n = attempts.get(str(run_id), 0) + 1
+            attempts[str(run_id)] = n
+            if n >= MAX_ATTEMPTS:
+                msg = (f"⚠️ [{slot}] 블로그 로컬 발행이 {n}번 연속 실패해서 포기함(run {run_id}) — "
+                       f"직접 확인해주세요.\n{tail}")
+                print(f"[watch_blog] {msg}")
+                _alert_once(state, run_id, msg)
+                processed.add(run_id)
+                state["processed_run_ids"] = sorted(processed)
+                _save_state(state)
+                continue
+            msg = f"⚠️ [{slot}] 블로그 로컬 발행 실패({n}/{MAX_ATTEMPTS}번째, run {run_id})\n{tail}"
             print(f"[watch_blog] {msg}")
             print("[watch_blog] 다음 폴링에서 재시도됨(이번 run은 처리 완료로 표시하지 않음)")
             _alert_once(state, run_id, msg)
-            _save_state(state)  # alerted_run_ids만 갱신 — processed는 그대로 두어 재시도되게 함
+            _save_state(state)  # alerted_run_ids/attempt_counts만 갱신 — processed는 그대로 두어 재시도되게 함
             continue
 
         processed.add(run_id)
