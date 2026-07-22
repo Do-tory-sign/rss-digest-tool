@@ -1233,6 +1233,32 @@ return true;
         except Exception:
             pass
 
+    # 2026-07-23: 라이브 디버깅으로 발견 — 'iframe.se-iframe, iframe[name="mainFrame"]'는
+    # 이 블로그에서 애초에 존재한 적이 없는(다른 프로젝트에서 넘어온 것으로 추정) 셀렉터라
+    # 항상 못 찾고 최상위 document로 폴백되고 있었음. 실제 타이핑 중 커서/Selection은 네이버
+    # SmartEditor가 동적으로 만드는 'input_buffer<타임스탬프>' 이름의 iframe 안에 있음(타이핑이
+    # 끝나고 어느 정도 지나면 내용이 최상위 document로 동기화되는 것으로 보임 — 그래서 삽입
+    # 직후 실행되는 검증/보정은 그 iframe을, 저장 직전 실행되는 최종 스윕은 최상위 document를
+    # 봐야 맞는 경우가 섞여 있었음). document.activeElement가 그 iframe을 가리키는 경우를
+    # 최우선으로 쓰고, 없으면 예전 셀렉터 → 최상위 document 순으로 안전하게 폴백한다.
+    _JS_FIND_EDITOR_CTX = """
+function __dotoryEditorCtx() {
+  const ae = document.activeElement;
+  if (ae && ae.tagName === 'IFRAME') {
+    try { if (ae.contentDocument) return {doc: ae.contentDocument, win: ae.contentWindow}; } catch (e) {}
+  }
+  const buf = document.querySelector('iframe[id^="input_buffer"]');
+  if (buf) {
+    try { if (buf.contentDocument) return {doc: buf.contentDocument, win: buf.contentWindow}; } catch (e) {}
+  }
+  const legacy = document.querySelector('iframe.se-iframe, iframe[name="mainFrame"]');
+  if (legacy) {
+    try { if (legacy.contentDocument) return {doc: legacy.contentDocument, win: legacy.contentWindow}; } catch (e) {}
+  }
+  return {doc: document, win: window};
+}
+"""
+
     def _insert_bold_via_html(self, text: str, color: str | None = None) -> bool:
         """Ctrl+B 토글은 붙여넣기 직후 상태 확인이 불안정해서(레이스 컨디션으로
         꺼짐 토글이 씹혀 이후 본문 전체가 계속 굵게 나오는 버그, 2026-07-02) 색 없이
@@ -1260,19 +1286,40 @@ return true;
         # 함수를 안 타고 예전 Ctrl+B 토글 경로로 빠지고 있었음 — 그게 바로 이 파일 곳곳에
         # 기록된 "토글 상태가 새는" 고질적 버그의 실제 발생 지점이었음(라이브 디버깅으로
         # 확인). 색도 <b>의 인라인 style로 같이 삽입해서 토글을 아예 안 타게 한다.
-        js = """
+        #
+        # 2026-07-23: document.execCommand('insertHTML', ...)가 최근 크롬에서 거의 항상
+        # false를 반환하기 시작함(execCommand 계열은 W3C에서 이미 deprecated 상태라 크롬이
+        # 갈수록 더 엄격하게 거부하는 것으로 추정) — 이 안전 경로 자체가 매번 실패해서
+        # 결국 매번 예전의 불안정한 Ctrl+B 토글로 폴백되고 있었고, 그게 "앞으로는?"과
+        # 그 앞 문단의 굵기가 뒤바뀌는 고질적 버그의 재발 원인이었음. execCommand 없이
+        # Selection/Range API로 <b> 요소를 직접 만들어 삽입하는 방식으로 교체 — 이 방식은
+        # deprecated API에 의존하지 않아 크롬 정책 변화에 영향받지 않는다.
+        # 실제 커서/Selection이 어디 있는지는 _JS_FIND_EDITOR_CTX가 동적으로 찾는다
+        # (activeElement가 가리키는 input_buffer<타임스탬프> iframe 우선).
+        js = self._JS_FIND_EDITOR_CTX + """
 const text = arguments[0];
 const color = arguments[1];
-const esc = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-const styleAttr = color ? (' style="color:' + color + '"') : '';
-return document.execCommand('insertHTML', false,
-    '<b data-dotory-bold="1"' + styleAttr + '>' + esc + '</b>');
+const ctx = __dotoryEditorCtx();
+const sel = ctx.win.getSelection();
+if (!sel || sel.rangeCount === 0) return false;
+const range = sel.getRangeAt(0);
+range.deleteContents();
+const b = ctx.doc.createElement('b');
+b.setAttribute('data-dotory-bold', '1');
+if (color) b.style.color = color;
+b.textContent = text;
+range.insertNode(b);
+range.setStartAfter(b);
+range.setEndAfter(b);
+range.collapse(true);
+sel.removeAllRanges();
+sel.addRange(range);
+return true;
 """
-        verify_js = """
+        verify_js = self._JS_FIND_EDITOR_CTX + """
 const text = arguments[0];
-const frame = document.querySelector('iframe.se-iframe, iframe[name="mainFrame"]');
-const doc = frame ? frame.contentDocument : document;
-const bolds = doc.querySelectorAll('b');
+const ctx = __dotoryEditorCtx();
+const bolds = ctx.doc.querySelectorAll('b');
 for (const b of bolds) {
   if (b.textContent && b.textContent.trim() === text.trim()) return true;
 }
@@ -1281,10 +1328,10 @@ return false;
         # 삽입 자체는 씹히지 않고 텍스트는 들어가는데 <b> 래핑만 누락되는 경우가 있어서
         # (재시도로 insertHTML을 다시 부르면 텍스트가 중복 삽입됨) — 검증 실패 시에는
         # 이미 들어간(굵게 안 된) 노드를 찾아 <b>로 감싸는 DOM 보정으로 처리한다.
-        repair_js = """
+        repair_js = self._JS_FIND_EDITOR_CTX + """
 const text = arguments[0];
-const frame = document.querySelector('iframe.se-iframe, iframe[name="mainFrame"]');
-const doc = frame ? frame.contentDocument : document;
+const ctx = __dotoryEditorCtx();
+const doc = ctx.doc;
 const spans = doc.querySelectorAll('span.__se-node, p span');
 for (const el of spans) {
   if (el.textContent && el.textContent.trim() === text.trim() && !el.querySelector('b') && el.closest('b') === null) {
@@ -1304,31 +1351,36 @@ return false;
             self._log(f"[naver] HTML 굵게 삽입 실패(exec 자체 예외, '{preview}'): {e}")
             return False
         if not exec_ok:
-            # 2026-07-19: execCommand('insertHTML', ...)의 반환값을 여태 안 찍고 있었음 —
-            # 검증 실패 로그만으로는 "삽입 명령 자체가 false를 반환했다"와 "삽입은 됐는데
-            # DOM에서 못 찾았다"를 구분할 수 없었음. 이번에 소제목 4개가 전부 검증 실패했는데
-            # (예전엔 간헐적) 이 값을 봐야 Chrome이 execCommand 자체를 거부하기 시작한 건지
-            # 판단 가능.
-            self._log(f"[naver] HTML 굵게 삽입: execCommand가 false 반환('{preview}') — "
-                       "브라우저가 삽입 자체를 거부한 것으로 보임")
-        # 커서를 <b> 밖으로 — 네이티브 End 키(실제 브라우저 키 이벤트)만 사용, JS로
-        # Selection/Range를 직접 건드리지 않는다 (스마트에디터 내부 커서 상태와 어긋나서
-        # 이후 Enter가 새 문단을 못 만드는 심각한 레이스가 있었음, 2026-07-02).
+            # 2026-07-23: execCommand를 걷어내고 Selection/Range 기반으로 바꾼 뒤로는, 이 값이
+            # false면 거의 항상 "커서 위치에 활성 Range/Selection이 없음"(sel.rangeCount === 0)
+            # 을 의미함 — 브라우저 거부가 아니라 삽입 시도 시점에 에디터에 실제 텍스트 커서가
+            # 없었다는 뜻이라 원인이 다름. 로그 문구도 그에 맞게 갱신.
+            self._log(f"[naver] HTML 굵게 삽입: JS가 false 반환('{preview}') — "
+                       "삽입 시점에 에디터에 활성 커서/Selection이 없었던 것으로 보임")
+        # 2026-07-23: 검증을 End키보다 먼저 해야 함 — 라이브 디버깅으로 확인한 바, 네이티브
+        # End 키를 누르는 순간 네이버 SmartEditor가 그 자리에서 새 빈 input_buffer iframe을
+        # 만들어버려서(activeElement가 그쪽으로 넘어감), 그 뒤에 검증하면 방금 넣은 내용이
+        # 있는 예전 버퍼가 아니라 새로 생긴 빈 버퍼를 보게 돼 매번 "검증 실패"로 오판하고
+        # 있었음(실제로는 삽입이 잘 됐었는데도). 검증을 먼저 끝내고, 성공이 확인된 뒤에만
+        # 커서 이동용 End 키를 누른다.
         try:
-            ActionChains(self.driver).send_keys(Keys.END).perform()
-        except Exception:
-            pass
-        time.sleep(0.15)
-        try:
-            if bool(self.driver.execute_script(verify_js, text)):
-                return True
+            verified_immediately = bool(self.driver.execute_script(verify_js, text))
         except Exception as e:
+            verified_immediately = False
             self._log(f"[naver] HTML 굵게 삽입 검증 중 예외('{preview}'): {e}")
+        if verified_immediately:
+            # 커서를 <b> 밖으로 — 네이티브 End 키(실제 브라우저 키 이벤트)만 사용, JS로
+            # Selection/Range를 직접 건드리지 않는다 (스마트에디터 내부 커서 상태와 어긋나서
+            # 이후 Enter가 새 문단을 못 만드는 심각한 레이스가 있었음, 2026-07-02).
+            try:
+                ActionChains(self.driver).send_keys(Keys.END).perform()
+            except Exception:
+                pass
+            return True
         self._log(f"[naver] HTML 굵게 삽입 1차 검증 실패, 보정 시도('{preview}')")
         # 보정 시도
         try:
             self.driver.execute_script(repair_js, text)
-            time.sleep(0.15)
             ok = bool(self.driver.execute_script(verify_js, text))
             try:
                 ActionChains(self.driver).send_keys(Keys.END).perform()
@@ -1353,9 +1405,9 @@ return false;
           문단 단위 최종 스윕으로 한 번 더 확정 처리).
         - 위 두 패스로도 안 잡히는 굵기 유출이 있으면(다른 메커니즘으로 새는 경우) 값은
           안 건드리고 로그만 남겨서 다음 재발 시 바로 원인을 좁힐 수 있게 한다."""
-        js = """
-const frame = document.querySelector('iframe.se-iframe, iframe[name="mainFrame"]');
-const doc = frame ? frame.contentDocument : document;
+        js = self._JS_FIND_EDITOR_CTX + """
+const ctx = __dotoryEditorCtx();
+const doc = ctx.doc;
 let unbolded = 0, bolded = 0;
 // 1) 소제목이 아닌데 굵은 것 -> 벗김
 // 2026-07-14: <b> 태그만 검사했더니, 토글(Ctrl+B) 상태가 새서 굵어진 본문이
