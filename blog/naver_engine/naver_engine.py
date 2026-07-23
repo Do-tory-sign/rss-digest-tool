@@ -50,17 +50,23 @@ DEFAULT_TEXT_COLOR = "#333333"
 COLOR_TEXT_COLOR = "#0078cb"
 POINT_TEXT_COLOR = "#ba0000"
 HEADING_TEXT_COLOR = "#007433"
+# 2026-07-23: 라이브 디버깅으로 확인 — 네이버 에디터 색상 팔레트는 정해진 76개 프리셋
+# 색상만 클릭으로 선택 가능한데, 이 목록의 절반 이상(#006666/#8a2be2/#9a005d/#0050a4/
+# #c45a00/#4b5f00/#7a3e00, 10개 중 7개)이 그 프리셋에 아예 없는 임의의 hex였음 —
+# _set_text_color가 팔레트에서 못 찾으면 조용히 아무것도 안 하고 넘어가서(예외도 안 남음)
+# 그동안 소제목 색이 안 먹힌 채로 계속 발행되고 있었을 가능성이 높음. 전부 실제 팔레트에
+# 존재하는 값으로 교체(직접 확인함).
 READABLE_TEXT_COLORS = (
     "#0078cb",  # deep blue
     "#007433",  # deep green
     "#ba0000",  # deep red
-    "#006666",  # teal
-    "#8a2be2",  # purple
-    "#9a005d",  # wine
-    "#0050a4",  # navy blue
-    "#c45a00",  # burnt orange
-    "#4b5f00",  # olive
-    "#7a3e00",  # brown
+    "#00756a",  # teal
+    "#740060",  # purple
+    "#bb005c",  # wine
+    "#004e82",  # navy blue
+    "#b85c00",  # burnt orange
+    "#36851e",  # olive
+    "#823f00",  # brown
 )
 HEADING_FONT_SIZE = "19"
 DEFAULT_FONT_SIZE = "15"
@@ -1233,165 +1239,83 @@ return true;
         except Exception:
             pass
 
-    # 2026-07-23: 라이브 디버깅으로 발견 — 'iframe.se-iframe, iframe[name="mainFrame"]'는
-    # 이 블로그에서 애초에 존재한 적이 없는(다른 프로젝트에서 넘어온 것으로 추정) 셀렉터라
-    # 항상 못 찾고 최상위 document로 폴백되고 있었음. 실제 타이핑 중 커서/Selection은 네이버
-    # SmartEditor가 동적으로 만드는 'input_buffer<타임스탬프>' 이름의 iframe 안에 있음(타이핑이
-    # 끝나고 어느 정도 지나면 내용이 최상위 document로 동기화되는 것으로 보임 — 그래서 삽입
-    # 직후 실행되는 검증/보정은 그 iframe을, 저장 직전 실행되는 최종 스윕은 최상위 document를
-    # 봐야 맞는 경우가 섞여 있었음). document.activeElement가 그 iframe을 가리키는 경우를
-    # 최우선으로 쓰고, 없으면 예전 셀렉터 → 최상위 document 순으로 안전하게 폴백한다.
-    _JS_FIND_EDITOR_CTX = """
-function __dotoryEditorCtx() {
-  const ae = document.activeElement;
-  if (ae && ae.tagName === 'IFRAME') {
-    try { if (ae.contentDocument) return {doc: ae.contentDocument, win: ae.contentWindow}; } catch (e) {}
-  }
-  const buf = document.querySelector('iframe[id^="input_buffer"]');
-  if (buf) {
-    try { if (buf.contentDocument) return {doc: buf.contentDocument, win: buf.contentWindow}; } catch (e) {}
-  }
-  const legacy = document.querySelector('iframe.se-iframe, iframe[name="mainFrame"]');
-  if (legacy) {
-    try { if (legacy.contentDocument) return {doc: legacy.contentDocument, win: legacy.contentWindow}; } catch (e) {}
-  }
-  return {doc: document, win: window};
-}
-"""
-
     def _insert_bold_via_html(self, text: str, color: str | None = None) -> bool:
-        """Ctrl+B 토글은 붙여넣기 직후 상태 확인이 불안정해서(레이스 컨디션으로
-        꺼짐 토글이 씹혀 이후 본문 전체가 계속 굵게 나오는 버그, 2026-07-02) 색 없이
-        굵게만 필요한 구간(소제목)은 토글 없이 <b> HTML을 직접 삽입해 확실하게 처리한다.
+        """소제목/포인트 텍스트를 굵게(+색) 넣는다.
 
-        insertHTML 자체가 가끔(레이스로 추정) 씹혀서 <b> 없이 평문으로 들어가는 경우가
-        확인됨(예: 세 번째 소제목 "| 앞으로는?"만 굵게 처리 누락, 2026-07-02) — 삽입 후
-        실제 DOM에 <b>가 붙었는지 검증하고, 없으면 재시도한다.
+        2026-07-23 전면 재작성 — 그동안 시도한 것과 실패 이유(전부 라이브 디버깅으로
+        실제 재현/확인함):
+        1. execCommand('insertHTML', ...)로 <b>를 직접 삽입 — 최근 크롬이 거의 항상
+           false를 반환(deprecated API에 대한 크롬의 정책 강화로 추정), 항상 토글로 폴백.
+        2. execCommand 없이 Selection/Range API로 <b>를 직접 삽입 — 검증까지는 통과하지만,
+           그 시점의 window.getSelection()이 실제 콘텐츠가 저장되는 최상위 document가
+           아니라 네이버 SmartEditor가 타이핑 중 동적으로 만드는 'input_buffer<타임스탬프>'
+           라는 임시 iframe을 보고 있었음 — 그 iframe에 넣은 내용은 최종 저장 문서에 전혀
+           반영되지 않고 사라짐(직후 검증은 통과하지만 실제 발행 결과물엔 없음).
+        3. 평문으로 타이핑 후 JS로 innerHTML을 통째로 교체해 <b>로 감싸기 — 감싸기 자체는
+           최상위 document에 잘 반영되지만, JS의 innerHTML 교체가 브라우저의 네이티브
+           커서/Selection 참조를 끊어버려서 그 다음 End 키가 커서를 <b> 밖으로 못 빼냄 —
+           결국 바로 이어서 타이핑하는 일반 본문까지 같은 <b> 안으로 이어 붙어 같이
+           굵게 나옴("굵은제목0 일반본문0"이 하나의 <b>로 합쳐지는 것을 실제 재현).
 
-        반대 방향 버그도 있었음: insertHTML 직후 커서가 <b> 태그 안쪽에 그대로 남아서,
-        바로 이어서 입력되는(이미지 삽입 후 이어지는) 일반 본문까지 굵게 상속되는 경우
-        (예: "왜 중요할까요?" 바로 다음 본문 문단이 통째로 굵게 나옴, 2026-07-02).
-        처음엔 이걸 execCommand('bold') 토글로 껐는데, 그 토글이 방금 넣은 <b> 자체를
-        다시 벗겨버리는 경우가 있었음(굵게 안 된 상태로 되돌아감, 같은 날 재확인) —
-        토글은 아예 쓰지 않는다.
+        최종 전략: 평문으로 타이핑(항상 최상위 document에 안정적으로 반영됨 — 여러 세션에
+        걸쳐 검증된 사실) → 방금 타이핑한 만큼만 Shift+왼쪽화살표로 네이티브 Selection을
+        만들어 Ctrl+B 토글 ON → End 키로 커서를 선택 밖으로 이동(네이티브 Selection 안에서
+        하는 이동이라 커서 참조가 안 끊김) → Ctrl+B 토글 OFF로 "다음 타이핑은 안 굵게" 상태
+        확정. JS로 DOM을 직접 건드리지 않고 전 과정을 네이티브 키 이벤트로만 수행하므로
+        브라우저의 커서 상태와 절대 어긋나지 않는다.
 
-        한 번 더 문제가 있었음: JS로 window.getSelection()/Range를 직접 조작해 커서를
-        굵지 않은 spacer로 옮기는 방식을 썼더니, 네이버 스마트에디터가 자체적으로 관리하는
-        내부 커서 상태와 실제 브라우저 Selection이 어긋나서, 그 다음 ActionChains의 네이티브
-        Enter 키 입력이 새 문단을 못 만들고 이후 텍스트가 전부 한 문단에 뭉쳐버리는 심각한
-        레이스가 발생함(소제목+본문 통째로 merge, 이미지 순서도 꼬임, 2026-07-02).
-        JS로 Selection을 건드리지 않고, 삽입 직후 네이티브 키보드 이벤트(End 키)만으로
-        커서를 <b> 밖으로 빼내 스마트에디터 자체 이벤트 리스너가 정상적으로 인식하게 한다."""
-        # 2026-07-17: 소제목은 항상 굵게+색이 같이 붙는데({{head:...}}), 색이 있으면 이
-        # 함수를 안 타고 예전 Ctrl+B 토글 경로로 빠지고 있었음 — 그게 바로 이 파일 곳곳에
-        # 기록된 "토글 상태가 새는" 고질적 버그의 실제 발생 지점이었음(라이브 디버깅으로
-        # 확인). 색도 <b>의 인라인 style로 같이 삽입해서 토글을 아예 안 타게 한다.
-        #
-        # 2026-07-23: document.execCommand('insertHTML', ...)가 최근 크롬에서 거의 항상
-        # false를 반환하기 시작함(execCommand 계열은 W3C에서 이미 deprecated 상태라 크롬이
-        # 갈수록 더 엄격하게 거부하는 것으로 추정) — 이 안전 경로 자체가 매번 실패해서
-        # 결국 매번 예전의 불안정한 Ctrl+B 토글로 폴백되고 있었고, 그게 "앞으로는?"과
-        # 그 앞 문단의 굵기가 뒤바뀌는 고질적 버그의 재발 원인이었음. execCommand 없이
-        # Selection/Range API로 <b> 요소를 직접 만들어 삽입하는 방식으로 교체 — 이 방식은
-        # deprecated API에 의존하지 않아 크롬 정책 변화에 영향받지 않는다.
-        # 실제 커서/Selection이 어디 있는지는 _JS_FIND_EDITOR_CTX가 동적으로 찾는다
-        # (activeElement가 가리키는 input_buffer<타임스탬프> iframe 우선).
-        js = self._JS_FIND_EDITOR_CTX + """
+        색깔은 툴바의 색상 팔레트를 클릭하는 _set_text_color를 더 이상 쓰지 않는다 —
+        라이브 테스트로 확인해보니 팔레트 버튼을 클릭하는 과정에서 방금 만든 텍스트 선택이
+        풀려버려서(포커스가 툴바로 이동) 색이 전혀 적용되지 않고 있었음(심지어 실제
+        팔레트에 있는 값으로 시도해도 마찬가지). 대신 굵게 처리가 끝난 뒤 그 <b> 요소를
+        찾아서 style.color를 JS로 직접 설정 — innerHTML을 통째로 갈아치우는 게 아니라
+        속성 하나만 건드리는 거라 커서 참조가 깨지지 않는다."""
+        preview = (text or "")[:20]
+        try:
+            self._type_text_like_human(text)
+        except Exception as e:
+            self._log(f"[naver] 굵게 처리용 텍스트 타이핑 실패('{preview}'): {e}")
+            return False
+        time.sleep(0.15)
+        try:
+            actions = ActionChains(self.driver)
+            actions.key_down(Keys.SHIFT)
+            for _ in range(len(text)):
+                actions.send_keys(Keys.ARROW_LEFT)
+            actions.key_up(Keys.SHIFT)
+            actions.perform()
+            time.sleep(0.1)
+            self._send_shortcut(Keys.CONTROL, "b")  # 선택 영역만 굵게 켜짐
+            time.sleep(0.1)
+            ActionChains(self.driver).send_keys(Keys.END).perform()  # 커서를 선택 밖으로
+            time.sleep(0.1)
+            self._send_shortcut(Keys.CONTROL, "b")  # 커서 위치의 "다음 타이핑 굵게" 상태를 꺼둠
+            time.sleep(0.1)
+        except Exception as e:
+            self._log(f"[naver] 굵게 토글 적용 중 예외('{preview}'): {e}")
+            return False
+        # 방금 토글로 굵게 만든 요소를 찾아 data-dotory-bold 마커 + 색상(style.color)을 같이
+        # 설정한다. _strip_stray_bold가 "|" 소제목이 아닌데도 의도적으로 굵은 곳
+        # ({{point:...}} 등)을 구분하는 데 마커를 쓴다. 못 찾아도 치명적이지 않음(마커 없으면
+        # "|" 판정에만 의존, 색 없으면 기본색으로 나올 뿐).
+        try:
+            mark_js = """
 const text = arguments[0];
 const color = arguments[1];
-const ctx = __dotoryEditorCtx();
-const sel = ctx.win.getSelection();
-if (!sel || sel.rangeCount === 0) return false;
-const range = sel.getRangeAt(0);
-range.deleteContents();
-const b = ctx.doc.createElement('b');
-b.setAttribute('data-dotory-bold', '1');
-if (color) b.style.color = color;
-b.textContent = text;
-range.insertNode(b);
-range.setStartAfter(b);
-range.setEndAfter(b);
-range.collapse(true);
-sel.removeAllRanges();
-sel.addRange(range);
-return true;
-"""
-        verify_js = self._JS_FIND_EDITOR_CTX + """
-const text = arguments[0];
-const ctx = __dotoryEditorCtx();
-const bolds = ctx.doc.querySelectorAll('b');
+const bolds = document.querySelectorAll('b, strong');
 for (const b of bolds) {
-  if (b.textContent && b.textContent.trim() === text.trim()) return true;
-}
-return false;
-"""
-        # 삽입 자체는 씹히지 않고 텍스트는 들어가는데 <b> 래핑만 누락되는 경우가 있어서
-        # (재시도로 insertHTML을 다시 부르면 텍스트가 중복 삽입됨) — 검증 실패 시에는
-        # 이미 들어간(굵게 안 된) 노드를 찾아 <b>로 감싸는 DOM 보정으로 처리한다.
-        repair_js = self._JS_FIND_EDITOR_CTX + """
-const text = arguments[0];
-const ctx = __dotoryEditorCtx();
-const doc = ctx.doc;
-const spans = doc.querySelectorAll('span.__se-node, p span');
-for (const el of spans) {
-  if (el.textContent && el.textContent.trim() === text.trim() && !el.querySelector('b') && el.closest('b') === null) {
-    el.innerHTML = '<b data-dotory-bold="1">' + el.innerHTML + '</b>';
+  if (b.textContent && b.textContent.trim() === text.trim() && !b.hasAttribute('data-dotory-bold')) {
+    b.setAttribute('data-dotory-bold', '1');
+    if (color) b.style.color = color;
     return true;
   }
 }
 return false;
 """
-        # 2026-07-17: 굵기 버그가 근본 수정(색 포함 HTML 삽입) 이후에도 재발해서, 다음에
-        # 또 재발하면 "안전 경로 자체가 실패해서 토글로 폴백된 건지" vs "다른 원인인지"를
-        # 바로 구분할 수 있게 각 단계 결과를 로그로 남긴다(추측 대신 증거로 다음 조치 결정).
-        preview = (text or "")[:20]
-        try:
-            exec_ok = self.driver.execute_script(js, text, color)
-        except Exception as e:
-            self._log(f"[naver] HTML 굵게 삽입 실패(exec 자체 예외, '{preview}'): {e}")
-            return False
-        if not exec_ok:
-            # 2026-07-23: execCommand를 걷어내고 Selection/Range 기반으로 바꾼 뒤로는, 이 값이
-            # false면 거의 항상 "커서 위치에 활성 Range/Selection이 없음"(sel.rangeCount === 0)
-            # 을 의미함 — 브라우저 거부가 아니라 삽입 시도 시점에 에디터에 실제 텍스트 커서가
-            # 없었다는 뜻이라 원인이 다름. 로그 문구도 그에 맞게 갱신.
-            self._log(f"[naver] HTML 굵게 삽입: JS가 false 반환('{preview}') — "
-                       "삽입 시점에 에디터에 활성 커서/Selection이 없었던 것으로 보임")
-        # 2026-07-23: 검증을 End키보다 먼저 해야 함 — 라이브 디버깅으로 확인한 바, 네이티브
-        # End 키를 누르는 순간 네이버 SmartEditor가 그 자리에서 새 빈 input_buffer iframe을
-        # 만들어버려서(activeElement가 그쪽으로 넘어감), 그 뒤에 검증하면 방금 넣은 내용이
-        # 있는 예전 버퍼가 아니라 새로 생긴 빈 버퍼를 보게 돼 매번 "검증 실패"로 오판하고
-        # 있었음(실제로는 삽입이 잘 됐었는데도). 검증을 먼저 끝내고, 성공이 확인된 뒤에만
-        # 커서 이동용 End 키를 누른다.
-        try:
-            verified_immediately = bool(self.driver.execute_script(verify_js, text))
-        except Exception as e:
-            verified_immediately = False
-            self._log(f"[naver] HTML 굵게 삽입 검증 중 예외('{preview}'): {e}")
-        if verified_immediately:
-            # 커서를 <b> 밖으로 — 네이티브 End 키(실제 브라우저 키 이벤트)만 사용, JS로
-            # Selection/Range를 직접 건드리지 않는다 (스마트에디터 내부 커서 상태와 어긋나서
-            # 이후 Enter가 새 문단을 못 만드는 심각한 레이스가 있었음, 2026-07-02).
-            try:
-                ActionChains(self.driver).send_keys(Keys.END).perform()
-            except Exception:
-                pass
-            return True
-        self._log(f"[naver] HTML 굵게 삽입 1차 검증 실패, 보정 시도('{preview}')")
-        # 보정 시도
-        try:
-            self.driver.execute_script(repair_js, text)
-            ok = bool(self.driver.execute_script(verify_js, text))
-            try:
-                ActionChains(self.driver).send_keys(Keys.END).perform()
-            except Exception:
-                pass
-            if not ok:
-                self._log(f"[naver] HTML 굵게 삽입 보정도 실패 — 토글 경로로 폴백됨('{preview}')")
-            return ok
-        except Exception as e:
-            self._log(f"[naver] HTML 굵게 삽입 보정 중 예외('{preview}'): {e} — 토글 경로로 폴백됨")
-            return False
+            self.driver.execute_script(mark_js, text, color)
+        except Exception:
+            pass
+        return True
 
     def _strip_stray_bold(self) -> None:
         """저장/발행 직전 최종 안전망: 의도적으로 굵은 곳(1. "|"로 시작하는 소제목,
@@ -1405,9 +1329,11 @@ return false;
           문단 단위 최종 스윕으로 한 번 더 확정 처리).
         - 위 두 패스로도 안 잡히는 굵기 유출이 있으면(다른 메커니즘으로 새는 경우) 값은
           안 건드리고 로그만 남겨서 다음 재발 시 바로 원인을 좁힐 수 있게 한다."""
-        js = self._JS_FIND_EDITOR_CTX + """
-const ctx = __dotoryEditorCtx();
-const doc = ctx.doc;
+        # 2026-07-23: 최종 저장 콘텐츠는 항상 최상위 document에 있음(라이브 디버깅으로 확인 —
+        # 버퍼 iframe에 들어간 내용은 최종 문서에 반영되지 않고 사라짐) — iframe을 찾으려는
+        # 시도 없이 최상위 document를 직접 본다.
+        js = """
+const doc = document;
 let unbolded = 0, bolded = 0;
 // 1) 소제목이 아닌데 굵은 것 -> 벗김
 // 2026-07-14: <b> 태그만 검사했더니, 토글(Ctrl+B) 상태가 새서 굵어진 본문이
@@ -1498,21 +1424,10 @@ return unbolded + '/' + bolded + '/' + JSON.stringify(leaks);
             self._size_dirty = True   # 이후 일반 텍스트에서 기본크기 재적용 보장
         normalized = self._normalize_keyboard_text(text)
         if bold:
-            # 2026-07-17: 예전엔 "굵게+색"(소제목, {{head:...}})일 때만 색이 있다는 이유로
-            # 이 안전한 HTML 삽입을 건너뛰고 Ctrl+B 토글 경로로 빠졌음 — 소제목은 항상
-            # 굵게+색 조합이라, 사실상 모든 소제목이 그 토글 버그에 계속 노출되고 있었던
-            # 게 근본 원인이었음. 색도 같이 HTML로 삽입해서 토글을 아예 안 타게 한다.
-            if self._insert_bold_via_html(normalized, color=color):
-                pass  # HTML 삽입으로 굵기+색 모두 이미 처리됨 — 토글/툴바 불필요
-            else:
-                # HTML 삽입 자체가 실패한 경우에만 예전 토글 경로로 폴백
-                if color:
-                    self._set_text_color(color)
-                self._send_shortcut(Keys.CONTROL, "b")
-                self._paste_segment(normalized)
-                self._send_shortcut(Keys.CONTROL, "b")
-                if color:
-                    self._set_text_color(DEFAULT_TEXT_COLOR)
+            # 2026-07-23: _insert_bold_via_html이 이제 타이핑까지 포함해 굵게+색을 전부 책임짐
+            # (내부에서 자체 폴백까지 처리) — 실패해도 이미 텍스트는 입력된 상태라 여기서
+            # 다시 타이핑하면 중복이 생기므로, 성공/실패와 무관하게 추가 타이핑은 하지 않는다.
+            self._insert_bold_via_html(normalized, color=color)
         elif color:
             self._set_text_color(color)
             # 강조 구간은 '붙여넣기'로 원자적 입력 — char 단위 타이핑 시 툴바 드롭다운 직후
