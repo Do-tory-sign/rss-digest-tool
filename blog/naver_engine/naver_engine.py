@@ -1294,10 +1294,15 @@ return true;
         except Exception as e:
             self._log(f"[naver] 굵게 토글 적용 중 예외('{preview}'): {e}")
             return False
-        # 방금 토글로 굵게 만든 요소를 찾아 data-dotory-bold 마커 + 색상(style.color)을 같이
-        # 설정한다. _strip_stray_bold가 "|" 소제목이 아닌데도 의도적으로 굵은 곳
-        # ({{point:...}} 등)을 구분하는 데 마커를 쓴다. 못 찾아도 치명적이지 않음(마커 없으면
-        # "|" 판정에만 의존, 색 없으면 기본색으로 나올 뿐).
+        # 방금 토글로 굵게 만든 요소를 찾아 data-dotory-bold 마커를 심는다. _strip_stray_bold가
+        # "|" 소제목이 아닌데도 의도적으로 굵은 곳({{point:...}} 등)을 구분하는 데 이 마커를
+        # 쓴다 — 발행 시점에 네이버가 <b>의 커스텀 속성/style을 지워버리는 걸 확인했지만
+        # (아래 색상 처리와 동일한 문제), 이 마커는 발행 *전* 스윕 단계에서만 읽으면 되므로
+        # 상관없다. 색상은 <b style="color:...">가 아니라 <b>로 감싼 <span style="color:...">
+        # 로 넣는다 — 실제 발행된 페이지를 직접 열어서 확인한 결과, 네이버가 <b> 태그 자체의
+        # style/커스텀 속성은 발행 시 전부 지워버리지만(굵기 자체는 유지), 색상 지정은 원래
+        # <span>으로 하는 게 네이버 에디터의 정식 방식이라 <span>에 넣으면 살아남을 가능성이
+        # 높다(자체 색상 툴바도 내부적으로 span을 씀).
         try:
             mark_js = """
 const text = arguments[0];
@@ -1306,7 +1311,12 @@ const bolds = document.querySelectorAll('b, strong');
 for (const b of bolds) {
   if (b.textContent && b.textContent.trim() === text.trim() && !b.hasAttribute('data-dotory-bold')) {
     b.setAttribute('data-dotory-bold', '1');
-    if (color) b.style.color = color;
+    if (color) {
+      const span = document.createElement('span');
+      span.style.color = color;
+      while (b.firstChild) span.appendChild(b.firstChild);
+      b.appendChild(span);
+    }
     return true;
   }
 }
