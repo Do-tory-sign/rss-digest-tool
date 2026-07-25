@@ -130,8 +130,19 @@ jobs:
       - name: 뉴스 수집 + 큐레이션 + 이미지 생성 (v2_main.py 그대로 재사용)
         if: ${{ !(github.event_name == 'schedule' || github.event.action == 'cron_trigger') || steps.dedup.outputs.cache-hit != 'true' }}
         shell: pwsh
+        env:
+          # 2026-07-23: "기사 다시 뽑기" 버튼이 방금 기사의 카테고리를 steps.feedback으로
+          # 뽑아만 놓고 실제로 v2_main.py에 전달을 안 해서, 재생성해도 완전히 동일한 조건
+          # (제외 카테고리 없음)으로 다시 큐레이션해 같은 기사가 그대로 다시 뽑히는 경우가
+          # 있었음 — 재시도할 때마다 Gemini 큐레이션+이미지 생성 크레딧만 낭비. 이제 이
+          # 카테고리를 --exclude로 넘겨서 방금 그 카테고리는 이번 재생성에서 제외한다.
+          REGEN_EXCLUDE_CATEGORY: ${{ steps.feedback.outputs.category }}
         run: |
-          python -X utf8 v2_main.py --slot $env:SLOT --fresh
+          if ($env:REGEN_EXCLUDE_CATEGORY) {
+            python -X utf8 v2_main.py --slot $env:SLOT --fresh --exclude $env:REGEN_EXCLUDE_CATEGORY
+          } else {
+            python -X utf8 v2_main.py --slot $env:SLOT --fresh
+          }
 
       # 2026-07-08: 경쟁 상태 버그 발견 — 예전엔 "산출물 캐시 저장"이 맨 마지막 스텝이라,
       # 텔레그램 메시지를 보낸 직후 사용자가 아주 빨리 승인을 누르면 stage2가 이 캐시가
