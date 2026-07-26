@@ -98,8 +98,13 @@ def _prepare_uploads(image_paths: list) -> list[str]:
     return urls
 
 
-def _deploy_firebase():
-    """메인 URL(dotory-news.web.app)에 진짜 배포"""
+def _deploy_firebase() -> bool:
+    """메인 URL(dotory-news.web.app)에 진짜 배포.
+    2026-07-26: 이 함수가 성공 여부를 반환도, 실패를 호출부에 알리지도 않았음 — 배포가
+    실패해도 그냥 다음 단계(인스타 업로드)로 넘어가버려서, 인스타가 방금 막 배포된 걸로
+    착각하고 재사용한 URL이 실제로는 사이트에 없어(404) 업로드가 실패하는 사고가 있었음
+    (실패 알림에는 심지어 "사이트는 정상 배포됨"이라고 잘못 나감). 이제 성공 여부를
+    반환하고, stderr가 비어있는 경우(실제로 발생함)를 대비해 stdout도 같이 남긴다."""
     project_dir = Path(__file__).parent
     print("\n[main] Firebase 배포 중...")
     result = subprocess.run(
@@ -111,8 +116,9 @@ def _deploy_firebase():
     )
     if result.returncode == 0:
         print("[main] Firebase 배포 완료")
-    else:
-        print(f"[main] Firebase 배포 실패:\n{result.stderr}")
+        return True
+    print(f"[main] Firebase 배포 실패 (exit {result.returncode}):\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}")
+    return False
 
 
 def _load_v2_data(run_dir: Path, slot: str) -> tuple[dict, dict]:
@@ -368,11 +374,23 @@ def run(slot: str, dry_run: bool = False, publish_only: bool = False) -> bool:
     category = article.get("category", "hot")
     save_today({category: data}, v2_articles=[article])
     public_urls = _prepare_uploads(final_images)
-    _deploy_firebase()
+    site_ok = _deploy_firebase()
 
     done_flag = run_dir / f"build_done_{slot}.txt"
     upload_ok = True
-    if UPLOAD_ENABLED:
+    if not site_ok:
+        # 2026-07-26: 사이트 배포가 실패하면 방금 올린 이미지 URL이 실제로는 존재하지
+        # 않으므로(404), 인스타 업로드를 시도해봐야 CDN 재시도만 반복하다 확정적으로
+        # 실패한다 — 시도 자체를 건너뛰고 정확한 원인으로 바로 알린다.
+        upload_ok = False
+        print("\n⚠️ Firebase 배포 실패로 인스타그램 업로드 건너뜀 (URL이 실제로 존재하지 않음)")
+        try:
+            from notify import notify_failure
+            notify_failure(f"사이트 배포 실패({slot}) — 인스타그램 업로드도 건너뜀(URL이 없어서 확정 실패). "
+                            f"이미지: {run_dir}")
+        except Exception:
+            pass
+    elif UPLOAD_ENABLED:
         print("\n[main] 인스타그램 업로드 중...")
         upload_ok = upload_carousel(final_images, article, slot=slot, public_urls=public_urls)
         if not upload_ok:
