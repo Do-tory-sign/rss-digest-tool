@@ -1,16 +1,14 @@
 {
   "hosting": {
     "public": "web",
-    "ignore": ["firebase.json", "**/.*"],
-    "headers": [
-      {
-        "source": "data.json",
-        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
-      },
-      {
-        "source": "v2/img/**",
-        "headers": [{ "key": "Cache-Control", "value": "public, max-age=300" }]
-      }
-    ]
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "index.html",
+      "v2/index.html",
+      "v2/img/**",
+      "data.json"
+    ],
+    "headers": []
   }
 }
