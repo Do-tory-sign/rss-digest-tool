@@ -42,6 +42,9 @@ cloud/.blog_watch.lock
 cloud/.blog_watch.log
 cloud/_artifact_tmp/
 
+# 블로그 초안 산출물 (발행 시점에 생성 → 즉시 소비, 이후 다시 읽히지 않음)
+blog/drafts/*.json
+
 # OS
 Thumbs.db
 .DS_Store

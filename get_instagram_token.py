@@ -2,11 +2,12 @@
 import webbrowser
 import urllib.parse
 import urllib.request
+import urllib.error
 import json
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-APP_ID = "3955097377955454"
-APP_SECRET = "49be582deb242d3966289c904393087e"
+APP_ID = "1565599531823080"
+APP_SECRET = "8dfceec19a0cc3237c0ed09fa4d6a218"
 REDIRECT_URI = "http://localhost:8080/"
 SCOPES = "instagram_business_basic,instagram_business_content_publish,instagram_business_manage_comments"
 
@@ -40,7 +41,7 @@ def post(url, data: dict):
     try:
         with urllib.request.urlopen(req) as r:
             return json.loads(r.read())
-    except urllib.request.urllib.error.HTTPError as e:
+    except urllib.error.HTTPError as e:
         return json.loads(e.read().decode())
 
 

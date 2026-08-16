@@ -158,7 +158,7 @@ def build_articles(curated: dict) -> list[dict]:
 
 def _working_data_path(today_key: str | None = None, slot: str | None = None) -> Path:
     """그날의 v2 합성 결과를 담는 작업용 파일 경로.
-    review.py / --deploy-only 등 별도 프로세스 간 핸드오프 용도 — 공개 사이트(web/)에는 노출 안 함.
+    --deploy-only 등 별도 프로세스 간 핸드오프 용도 — 공개 사이트(web/)에는 노출 안 함.
     실제 사이트(web/data.json)는 news_archive.save_today()가 단일 소스로 관리함.
     슬롯이 주어지면 슬롯별 파일로 분리 (하루 4슬롯이 서로 안 덮어쓰게)."""
     today_key = today_key or config.now_kst().strftime("%Y%m%d")
@@ -476,7 +476,7 @@ if __name__ == "__main__":
                     notify_failure(
                         f"⚠️ 도토리뉴스({slot or '기본'}) 기사 생성 실패 — 후보 기사들이 전부 "
                         f"원문 소스를 못 찾았어요(포털 단독 기사 등). 자동 재시도 2회도 실패.\n"
-                        f"수동 재시도: `{retry_cmd}` 실행 후 review.py로 이어서 진행하세요."
+                        f"수동 재시도: `{retry_cmd}` 실행 후 GitHub Actions에서 Stage 1을 다시 트리거해주세요."
                     )
                 except Exception:
                     pass

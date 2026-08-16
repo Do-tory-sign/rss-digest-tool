@@ -154,20 +154,6 @@ def notify_failure(reason: str):
     send(f"❌ DO's TORY NEWS 업로드 실패\n원인: {reason}")
 
 
-def notify_session_expired():
-    send(
-        "⚠️ Instagram 세션 만료됨\n\n"
-        "오늘 밤 안에 갱신해주세요:\n"
-        "1. Chrome → instagram.com 로그인\n"
-        "2. F12 → Application → Cookies → sessionid 복사\n"
-        "3. 터미널: python -X utf8 instagram_setup.py"
-    )
-
-
-def notify_session_ok():
-    send("✅ Instagram 세션 정상")
-
-
 def notify_token_warning(days_left: int, expires_on: str):
     if days_left <= 7:
         urgency = "🚨 긴급"
