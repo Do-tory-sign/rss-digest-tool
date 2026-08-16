@@ -983,7 +983,7 @@ return true;
                 ActionChains(self.driver).send_keys(char).perform()
                 time.sleep(random.uniform(0.01, 0.025))
             time.sleep(0.5)
-            return title[:12] in self._read_title_text()
+            return text[:12] in self._read_title_text()
         except Exception:
             pass
         try:
@@ -994,82 +994,96 @@ return true;
             time.sleep(0.2)
             element.send_keys(text)
             time.sleep(0.5)
-            return title[:12] in self._read_title_text()
+            return text[:12] in self._read_title_text()
         except Exception:
             return False
 
     def _type_title(self, title: str) -> None:
         """현재 컨텍스트에서 제목을 입력합니다 (_ensure_editor_ready 호출 후 사용)."""
-        # 0. 클립보드 붙여넣기 우선 (IME 안전 + 포커스 흔들림에도 안정적, 저장모델 반영됨)
-        element = self._find_title_element()
-        if element is not None:
-            try:
-                self._js_click_element(element)
-                time.sleep(0.2)
-                try:
-                    ActionChains(self.driver).move_to_element(element).click().perform()
-                except Exception:
-                    pass
-                time.sleep(0.2)
-                self._send_shortcut(Keys.CONTROL, "a")
-                self._send_shortcut(Keys.DELETE)
-                time.sleep(0.15)
-                self._paste_segment(self._normalize_keyboard_text(title))
-                time.sleep(0.4)
-                if title[:12] in self._read_title_text():
-                    return
-            except Exception:
-                pass
+        # 2026-08-16: 예전엔 0단계로 클립보드 붙여넣기를 먼저 시도했는데, win32clipboard가
+        # 가끔 OpenClipboard 접근 거부(다른 프로그램이 클립보드를 순간 점유)로 실패하면
+        # _paste_segment 내부에서 조용히 키보드 타이핑으로 폴백하면서 이미 한 번 입력이
+        # 들어가고, 그 직후 검증 실패로 아래 1/2단계가 같은 노드에 다시 타이핑해 제목이
+        # "제목제목"처럼 겹쳐 저장되는 사고가 실제로 발생함(라이브 재현으로 확인). 붙여넣기
+        # 경로를 걷어내고, 자체적으로 select-all+delete 후 입력하는 키보드 경로만 쓴다.
+        # 검증은 항상 정규화된 텍스트 기준으로 한다 — 원본에 곱슬따옴표(“)/em-dash 등이
+        # 있으면 타이핑 시엔 정규화(예: " )되지만 검증을 원본과 비교하면 영원히 실패해서
+        # (실제로는 정상 입력됐는데도) 아래 폴백들이 계속 재입력을 시도해 제목이 중복
+        # 저장되는 사고가 있었음(2026-08-16, 라이브 재현으로 확인).
+        normalized = self._normalize_keyboard_text(title)
         # 1. JS로 제목 영역 포커스
         self._focus_title()
         # 2. 실제 키보드 이벤트 입력 (네이버 저장 모델 반영 우선)
         if self._type_title_via_keyboard(title):
             time.sleep(0.3)
-            if title[:12] in self._read_title_text():
+            if normalized[:12] in self._read_title_text():
                 return
         # 3. JS 클릭 + element.send_keys 시도 (폴백)
+        # 2026-08-16: 2단계(_type_title_via_keyboard)는 내부적으로 이미 clear+type+검증까지
+        # 했을 수 있음 — 그 검증 자체가 오탐(false negative)으로 실패해도 실제 입력은 이미
+        # 들어가 있을 수 있으므로, 아래 폴백들은 반드시 자체적으로 다시 clear한 뒤에 타이핑
+        # 해야 한다(과거엔 여기서 clear 없이 바로 타이핑해 제목이 두 번 겹쳐 저장되는
+        # 사고가 있었음).
         element = self._find_title_element()
         if element is not None:
             try:
                 self._js_click_element(element)
-                element.send_keys(self._normalize_keyboard_text(title))
+                self._send_shortcut(Keys.CONTROL, "a")
+                self._send_shortcut(Keys.DELETE)
+                time.sleep(0.15)
+                element.send_keys(normalized)
                 time.sleep(0.5)
-                if title[:12] in self._read_title_text():
+                if normalized[:12] in self._read_title_text():
                     return
             except Exception:
                 pass
             try:
                 self._js_click_element(element)
                 time.sleep(0.2)
-                for char in self._normalize_keyboard_text(title):
+                self._send_shortcut(Keys.CONTROL, "a")
+                self._send_shortcut(Keys.DELETE)
+                time.sleep(0.15)
+                for char in normalized:
                     ActionChains(self.driver).send_keys(char).perform()
                     time.sleep(random.uniform(0.012, 0.035))
                 time.sleep(0.5)
-                if title[:12] in self._read_title_text():
+                if normalized[:12] in self._read_title_text():
                     return
             except Exception:
                 pass
         # 4. 마지막: 포커스된 곳에 타이핑 (최후 수단)
+        try:
+            self._send_shortcut(Keys.CONTROL, "a")
+            self._send_shortcut(Keys.DELETE)
+            time.sleep(0.15)
+        except Exception:
+            pass
         self._type_text_like_human(title)
         time.sleep(0.5)
 
     def _read_title_text(self) -> str:
+        # 2026-08-16: 예전엔 개별 문단 노드뿐 아니라 .se-title-text 루트 자체의 innerText도
+        # 후보에 같이 넣었는데, 제목 영역에 문단이 여러 개(예: 붙여넣기 실패 잔여 + 재입력분)
+        # 남아있으면 루트 innerText가 그 여러 문단을 이어붙인 값이라 "제목제목" 식으로 중복
+        # 판독되는 사고가 있었음 — 이제 leaf 문단 노드만 보고, 그중 가장 마지막(최신) 값을 쓴다.
         js = """
 const roots=Array.from(document.querySelectorAll('.se-documentTitle,.se-title-text'));
 const clean=s=>(s||'').replace(/\\s+/g,' ').trim();
 const isUiText=t=>!t||t==='제목'||t.includes('배경 사진')||t.includes('삭제')||t.includes('사진 삭제');
 const values=[];
 for(const root of roots){
-  const nodes=Array.from(root.querySelectorAll('[contenteditable="true"],.se-text-paragraph'));
-  if(root.classList && root.classList.contains('se-title-text')) nodes.push(root);
+  let nodes=Array.from(root.querySelectorAll('[contenteditable="true"],.se-text-paragraph'));
+  if(!nodes.length && root.classList && root.classList.contains('se-title-text')) nodes=[root];
   for(const n of nodes){
     const t=clean(n.innerText||n.textContent||n.value||'');
     if(isUiText(t))continue;
     values.push(t);
   }
 }
-values.sort((a,b)=>a.length-b.length);
-return values.find(v=>v.length>=2)||'';
+for(let i=values.length-1;i>=0;i--){
+  if(values[i].length>=2) return values[i];
+}
+return '';
 """
         try:
             return str(self.driver.execute_script(js) or "").strip()
@@ -1077,7 +1091,8 @@ return values.find(v=>v.length>=2)||'';
             return ""
 
     def _ensure_title_written(self, title: str) -> tuple[bool, str]:
-        probe = title[:12]
+        probe = self._normalize_keyboard_text(title)[:12]  # 2026-08-16: 원본 문자열로 비교하면
+        # 곱슬따옴표 등이 타이핑 시 정규화된 문자와 영영 안 맞아 검증이 항상 실패함
         actual = ""
         for attempt in range(3):
             actual = self._read_title_text()
@@ -1088,6 +1103,12 @@ return values.find(v=>v.length>=2)||'';
                 time.sleep(0.5)
                 continue
             self._focus_title()
+            try:  # 2026-08-16: clear 없이 재타이핑하면 기존 내용 위에 겹쳐써 중복되던 사고
+                self._send_shortcut(Keys.CONTROL, "a")
+                self._send_shortcut(Keys.DELETE)
+                time.sleep(0.15)
+            except Exception:
+                pass
             self._type_text_like_human(title)
             time.sleep(0.6)
 
