@@ -73,10 +73,13 @@ def _deploy_images(image_paths: list) -> list[str]:
     return urls
 
 
-CDN_PROPAGATION_RETRY_WAITS = [20, 40, 60]  # 2026-07-05: Firebase 배포 직후 CDN 전파가
+CDN_PROPAGATION_RETRY_WAITS = [180, 180, 180, 180]  # 2026-07-05: Firebase 배포 직후 CDN 전파가
 # 안 끝난 상태에서 인스타가 먼저 이미지를 가져오려다 실패(code 9004, "미디어를 가져올 수
 # 없음")하는 게 반복적으로 발생 — 파일 자체는 몇십 초 뒤면 항상 정상이었음(수동으로 curl
 # 확인해보면 200으로 바뀜). 매번 사람이 몇 분 기다렸다 수동 재시도하던 걸 자동화.
+# 2026-08-16: 슬롯별 uploads/ 파일명이 고정이라(예: morning_00_cover.jpg) 매번 "기존 캐시
+# 무효화"가 필요한데, 이게 엣지마다 걸리는 시간이 들쭉날쭉해서 기존 총 대기 2분(20+40+60초)
+# 으로는 가끔 부족했음(예: 아침 슬롯이 2분 넘게 걸려 실패) — 3분 간격 4회(총 12분)로 늘림.
 
 
 def _is_media_fetch_transient_error(res: dict) -> bool:
