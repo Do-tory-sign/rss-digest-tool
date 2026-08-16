@@ -58,13 +58,25 @@ jobs:
         with:
           manual_slot: ${{ inputs.slot }}
 
+      - name: KST 날짜 계산 (슬롯별 캐시 키용)
+        id: kst
+        uses: ./.github/actions/kst-date
+        with:
+          slot: ${{ steps.slot.outputs.slot }}
+
+      # 2026-08-16: 예전엔 prefix 기반 restore-keys만 써서 "가장 최근에 저장된 캐시"를
+      # 가져왔는데, 이건 지금 발행하려는 슬롯과 무관하게 그 사이 다른 슬롯이 먼저 돌면
+      # 그 슬롯 데이터를 가져오는 문제였음 — 승인이 늦어진 슬롯을 나중에 재발행하면
+      # 거의 항상 엉뚱한(혹은 없는) 데이터를 만나 "v2 데이터 없음"으로 실패했다(실제
+      # 재현: 아침 슬롯을 몇 시간 뒤 재시도했더니 점심 캐시가 덮어쓴 상태였음). 이제
+      # 날짜+슬롯 고정 키를 우선 쓰고, 옛날 데이터(고정 키 도입 전 실행)만 prefix로 폴백.
       - name: Stage 2가 만든 승인된 카드 이미지 복원
         uses: actions/cache/restore@v4
         with:
           path: |
             D:/Dotory/Cardnews/output
             web/v2/img
-          key: dotory-output-nokey
+          key: dotory-output-${{ steps.kst.outputs.date }}-${{ steps.slot.outputs.slot }}
           restore-keys: |
             dotory-output-
 

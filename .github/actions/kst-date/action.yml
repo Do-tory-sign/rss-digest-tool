@@ -1,0 +1,34 @@
+# 2026-08-16: 슬롯별 산출물 캐시 키(dotory-output-<날짜>-<슬롯>)를 정확히 만들려면 모든
+# 워크플로우가 "오늘 날짜(KST)"를 똑같은 규칙으로 계산해야 한다 — stage1_collect.yml에
+# 있던 로직(night 슬롯의 자정 넘김 보정 포함)을 그대로 복붙하지 말고 공용 액션으로 뽑음.
+name: "KST 날짜 계산"
+description: "슬롯 기준 오늘 날짜(KST, yyyyMMdd)를 계산한다 (night 자정 넘김 보정 포함)"
+
+inputs:
+  slot:
+    description: "morning/lunch/evening/night"
+    required: true
+
+outputs:
+  date:
+    description: "yyyyMMdd (KST)"
+    value: ${{ steps.calc.outputs.date }}
+
+runs:
+  using: "composite"
+  steps:
+    - id: calc
+      shell: pwsh
+      env:
+        SLOT: ${{ inputs.slot }}
+      run: |
+        $kst = [System.TimeZoneInfo]::FindSystemTimeZoneById("Korea Standard Time")
+        $nowKst = [System.TimeZoneInfo]::ConvertTimeFromUtc((Get-Date).ToUniversalTime(), $kst)
+        # night(21시) 슬롯이 자정을 넘겨 지연 실행되면(예: 00:17 KST) 그 시점의 "오늘 날짜"는
+        # 이미 다음 날짜라서 캐시 키가 엉뚱한 날짜를 가리키게 됨 — night이 정오 이전이면
+        # "전날 밤의 지연 실행"으로 보고 날짜를 하루 되돌린다(stage1_collect.yml과 동일 규칙).
+        $date = $nowKst.ToString('yyyyMMdd')
+        if ($env:SLOT -eq "night" -and $nowKst.Hour -lt 12) {
+          $date = $nowKst.AddDays(-1).ToString('yyyyMMdd')
+        }
+        echo "date=$date" >> $env:GITHUB_OUTPUT

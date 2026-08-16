@@ -28,6 +28,9 @@ env:
 jobs:
   patch-and-regen:
     runs-on: windows-latest
+    permissions:
+      contents: read
+      actions: write  # 슬롯별 캐시 키 재저장 전 기존 키 삭제(gh cache delete)에 필요
     env:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -46,13 +49,22 @@ jobs:
         shell: pwsh
         run: New-Item -ItemType Directory -Force -Path "D:/Dotory/Cardnews/output" | Out-Null
 
-      - name: Stage 2 산출물 복원
+      - name: KST 날짜 계산 (슬롯별 캐시 키용)
+        id: kst
+        uses: ./.github/actions/kst-date
+        with:
+          slot: ${{ inputs.slot }}
+
+      # 2026-08-16: prefix 기반 restore-keys("가장 최근 저장된 캐시")는 다른 슬롯이 그 사이
+      # 먼저 돌면 엉뚱한 슬롯 데이터를 가져옴 — 날짜+슬롯 고정 키를 우선 사용하고, 옛날
+      # 데이터(고정 키 도입 전 실행)를 위해 prefix를 폴백으로만 둔다.
+      - name: 이 슬롯의 최신 산출물 복원
         uses: actions/cache/restore@v4
         with:
           path: |
             D:/Dotory/Cardnews/output
             web/v2/img
-          key: dotory-output-nokey
+          key: dotory-output-${{ steps.kst.outputs.date }}-${{ inputs.slot }}
           restore-keys: |
             dotory-output-
 
@@ -68,3 +80,20 @@ jobs:
             D:/Dotory/Cardnews/output
             web/v2/img
           key: dotory-output-${{ github.run_id }}
+
+      - name: 슬롯별 캐시 키 갱신 (날짜+슬롯 고정 키)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CACHE_KEY: dotory-output-${{ steps.kst.outputs.date }}-${{ inputs.slot }}
+        run: |
+          gh cache delete "$env:CACHE_KEY" --repo ${{ github.repository }} 2>$null
+          exit 0
+
+      - name: 슬롯별 캐시 저장 (날짜+슬롯 고정 키)
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            D:/Dotory/Cardnews/output
+            web/v2/img
+          key: dotory-output-${{ steps.kst.outputs.date }}-${{ inputs.slot }}
