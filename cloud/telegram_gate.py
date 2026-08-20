@@ -119,8 +119,25 @@ def cmd_send_article(args):
     if article.get("fallback_used"):
         warning += "\n\n⚠️ AI 합성이 실패해서 간단 규칙기반 문구로 대체됐어요"
 
+    # 2026-08-20: 승인 요청 메시지에 원문 링크가 아예 없어서, 승인 여부를 판단하려면
+    # 발행이 끝날 때까지(한참 뒤) 기다려야만 원문을 확인할 수 있었음(사용자 피드백) —
+    # source_links[0]이 항상 "선정기사"(news/multi_source.py의 원 기사)라 이걸 보여준다.
+    # 나머지 소스는 Google 뉴스 검색 결과라 몇 곳을 더 참고했는지만 곁들인다.
+    source_line = ""
+    source_links = article.get("source_links") or []
+    if source_links:
+        primary = source_links[0]
+        outlet = primary.get("outlet", "")
+        link = primary.get("link", "")
+        if link:
+            source_line = f"\n\n🔗 원문: {outlet}\n{link}"
+            if len(source_links) > 1:
+                source_line += f"\n(외 {len(source_links) - 1}곳 참고)"
+
     slot_label = SLOT_LABEL.get(slot, slot)
-    caption = f"{slot_label} | {label}\n\n<b>{title}</b>\n\n{lead}{warning}"
+    caption = f"{slot_label} | {label}\n\n<b>{title}</b>\n\n{lead}{warning}{source_line}"
+    if img_path.exists() and len(caption) > 1024:  # 사진 첨부 캡션은 텔레그램 1024자 제한
+        caption = caption[:1000].rsplit("\n", 1)[0] + "\n…(길어서 일부 생략)"
 
     markup = {
         "inline_keyboard": [
