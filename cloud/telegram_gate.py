@@ -121,23 +121,24 @@ def cmd_send_article(args):
 
     # 2026-08-20: 승인 요청 메시지에 원문 링크가 아예 없어서, 승인 여부를 판단하려면
     # 발행이 끝날 때까지(한참 뒤) 기다려야만 원문을 확인할 수 있었음(사용자 피드백) —
-    # source_links[0]이 항상 "선정기사"(news/multi_source.py의 원 기사)라 이걸 보여준다.
-    # 나머지 소스는 Google 뉴스 검색 결과라 몇 곳을 더 참고했는지만 곁들인다.
+    # source_links를 전부 나열한다(2026-08-20 재요청: 첫 곳만이 아니라 전부 보고 싶어함).
     source_line = ""
     source_links = article.get("source_links") or []
-    if source_links:
-        primary = source_links[0]
-        outlet = primary.get("outlet", "")
-        link = primary.get("link", "")
-        if link:
-            source_line = f"\n\n🔗 원문: {outlet}\n{link}"
-            if len(source_links) > 1:
-                source_line += f"\n(외 {len(source_links) - 1}곳 참고)"
+    valid_links = [s for s in source_links if s.get("link")]
+    if valid_links:
+        lines = [f"{s.get('outlet', '')}: {s['link']}" for s in valid_links]
+        source_line = "\n\n🔗 원문(" + str(len(valid_links)) + "곳)\n" + "\n".join(lines)
 
     slot_label = SLOT_LABEL.get(slot, slot)
-    caption = f"{slot_label} | {label}\n\n<b>{title}</b>\n\n{lead}{warning}{source_line}"
-    if img_path.exists() and len(caption) > 1024:  # 사진 첨부 캡션은 텔레그램 1024자 제한
-        caption = caption[:1000].rsplit("\n", 1)[0] + "\n…(길어서 일부 생략)"
+    caption_base = f"{slot_label} | {label}\n\n<b>{title}</b>\n\n{lead}{warning}"
+    caption = caption_base + source_line
+    # 사진 첨부 캡션은 텔레그램 1024자 제한 — 링크 4~5개면 쉽게 넘어간다. 잘라서 일부
+    # 링크를 숨기지 않고(그러면 안 보여달라는 요청과 반대가 됨), 캡션엔 본문만 두고
+    # 원문 링크는 별도 팔로우업 메시지로 전부 보낸다.
+    source_followup = None
+    if img_path.exists() and len(caption) > 1024:
+        caption = caption_base
+        source_followup = source_line.strip()
 
     markup = {
         "inline_keyboard": [
@@ -160,6 +161,8 @@ def cmd_send_article(args):
         msg_id = _send_photo(img_path.read_bytes(), "image.jpg", caption, markup)
     if msg_id is None:
         msg_id = _send_message(caption, markup)
+    if source_followup:
+        _send_message(source_followup)
 
     print(f"[telegram_gate] [{slot}] 기사 승인 요청 전송 완료 (message_id={msg_id})")
     sys.exit(0 if msg_id else 1)
